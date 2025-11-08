@@ -815,6 +815,31 @@ def main():
                 pbar.set_postfix(loss=f"{avg_loss:.4f}")
 
                 diagnostics.report(global_step + 1, optimizer, raw_norm, clipped, before, after)
+
+                if (global_step + 1) % config.SAVE_EVERY_N_STEPS == 0:
+                    current_optim_step = (global_step + 1) // config.GRADIENT_ACCUMULATION_STEPS
+                    ckpt_name = f"{Path(config.SINGLE_FILE_CHECKPOINT_PATH).stem}_step{current_optim_step}"
+                    
+                    # Save state
+                    torch.save(
+                        {"step": current_optim_step, "optimizer_state_dict": optimizer.state_dict()},
+                        ckpt_dir / f"{ckpt_name}_state.pt",
+                    )
+                    
+                    # Save model
+                    ckpt_sd = base_model_sd.copy()
+                    unet_sd = unet.state_dict()
+                    key_map = _generate_hf_to_sd_unet_key_mapping(list(unet_sd.keys()))
+                    for name in trainable_names:
+                        mapped = key_map.get(name)
+                        if mapped:
+                            sd_key = "model.diffusion_model." + mapped
+                            if sd_key in ckpt_sd:
+                                ckpt_sd[sd_key] = unet_sd[name].to(config.compute_dtype)
+                    
+                    save_file(ckpt_sd, ckpt_dir / f"{ckpt_name}.safetensors")
+                    print(f"\nSaved checkpoint at step {current_optim_step}")
+                
                 accumulated_paths.clear()
 
             global_step += 1
@@ -937,3 +962,4 @@ if __name__ == "__main__":
     except RuntimeError:
         pass
     main()
+
