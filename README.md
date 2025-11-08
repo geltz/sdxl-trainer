@@ -12,7 +12,10 @@ Key changes:
 Usage:
 
 `python -m venv venv`    
-`./venv/scripts/activate`    
+`./venv/scripts/activate`
+
+(Before requirements, it is recommended to [install pytorch](https://pytorch.org/get-started/locally/) with proper libraries).    
+
 `pip install -r requirements.txt`    
 `python gui.py`  
 
