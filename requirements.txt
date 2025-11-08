@@ -1,0 +1,10 @@
+Pillow
+tqdm
+numpy
+protobuf
+psutil
+pywin32
+scipy
+pandas
+matplotlib
+xformers
