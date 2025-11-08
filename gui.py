@@ -939,7 +939,8 @@ class ProcessRunner(QThread):
         try:
             flags = self.creation_flags
             if os.name == 'nt':
-                flags |= (subprocess.CREATE_NEW_PROCESS_GROUP | subprocess.HIGH_PRIORITY_CLASS)
+                # Remove CREATE_NEW_PROCESS_GROUP - it breaks terminate()
+                flags |= subprocess.HIGH_PRIORITY_CLASS
             self.process = subprocess.Popen(
                 [self.executable] + self.args,
                 cwd=self.working_dir,
@@ -979,13 +980,29 @@ class ProcessRunner(QThread):
     
     def stop(self):
         if self.process and self.process.poll() is None:
-            self.process.terminate()
             try:
-                self.process.wait(timeout=3)
-            except subprocess.TimeoutExpired:
-                self.process.kill()
-                self.process.wait()
-            self.logSignal.emit("Process stopped.")
+                if os.name == 'nt':
+                    # Windows: must use CTRL_BREAK_EVENT with process groups
+                    self.process.send_signal(subprocess.signal.CTRL_BREAK_EVENT)
+                else:
+                    self.process.terminate()
+                
+                self.logSignal.emit("Stopping training...")
+                
+                # Wait for graceful shutdown
+                try:
+                    self.process.wait(timeout=5)
+                except subprocess.TimeoutExpired:
+                    self.logSignal.emit("Force killing process...")
+                    self.process.kill()
+                    self.process.wait()
+            except Exception as e:
+                self.logSignal.emit(f"Error stopping process: {e}")
+                try:
+                    self.process.kill()
+                    self.process.wait()
+                except:
+                    pass
 
 class TrainingGUI(QtWidgets.QWidget):
     UI_DEFINITIONS = {
@@ -2119,6 +2136,8 @@ class TrainingGUI(QtWidgets.QWidget):
     def stop_training(self):
         if self.process_runner and self.process_runner.isRunning():
             self.process_runner.stop()
+            self.process_runner.wait()  # Wait for thread to finish
+            self.training_finished(-1)  # Trigger cleanup with error code
         else:
             self.log("No active training process to stop.")
     

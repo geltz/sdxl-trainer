@@ -570,10 +570,19 @@ class TimestepSampler:
         self.consecutive_spike_count = 0
 
     def sample(self, batch_size: int):
+        # LogSNR must be checked first
+        if self.use_log_snr and self.method == "Uniform LogSNR" and self.log_snr_per_t is not None:
+            u = torch.rand(batch_size, device=self.device)
+            log_snr = self.log_snr_min + u * (self.log_snr_max - self.log_snr_min)
+            diffs = (self.log_snr_per_t.view(1, -1) - log_snr.view(-1, 1)).abs()
+            idx = diffs.argmin(dim=1).long()
+            return idx
+        
         # uniform float
         if "Uniform Continuous" in self.method:
             t = torch.rand(batch_size, device=self.device)
             return (t * (self.num_train_timesteps - 1)).long()
+        
         # dynamic window
         if "Dynamic" in self.method:
             mn = int(self.current_min_ts)
@@ -581,17 +590,11 @@ class TimestepSampler:
             if mn >= mx:
                 mn = max(0, mx - 1)
             return torch.randint(mn, mx + 1, (batch_size,), device=self.device)
-        # random integer / fixed window
+        
+        # fallback: random integer
         mn = int(getattr(self.config, "TIMESTEP_SAMPLING_MIN", 0))
         mx = int(getattr(self.config, "TIMESTEP_SAMPLING_MAX", self.num_train_timesteps - 1))
         return torch.randint(mn, mx + 1, (batch_size,), device=self.device)
-        
-        if self.use_log_snr and self.method == "Uniform LogSNR" and self.log_snr_per_t is not None:
-            u = torch.rand(batch_size, device=self.device)
-            log_snr = self.log_snr_min + u * (self.log_snr_max - self.log_snr_min)
-            diffs = (self.log_snr_per_t.view(1, -1) - log_snr.view(-1, 1)).abs()
-            idx = diffs.argmin(dim=1).long()
-            return id
 
     def update(self, raw_grad_norm: float):
         if "Dynamic" not in self.method:
