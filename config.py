@@ -95,11 +95,12 @@ USE_NOISE_OFFSET = False
 NOISE_OFFSET = 0.0
 USE_MULTISCALE_NOISE = False 
 
-# timestep sampling # "Dynamic", "Uniform Continuous", "Random Integer"
+# --- Timestep Sampling ---
 TIMESTEP_SAMPLING_MIN = 0
 TIMESTEP_SAMPLING_MAX = 999
 TIMESTEP_SAMPLING_GRAD_MIN = 0.5
 TIMESTEP_SAMPLING_GRAD_MAX = 2.0
 
 USE_LOG_SNR = True
+
 TIMESTEP_SAMPLING_METHOD = "Uniform LogSNR"
