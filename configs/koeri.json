@@ -1,5 +1,5 @@
 {
-    "SINGLE_FILE_CHECKPOINT_PATH": "D:/finetune/trainer/pingo.safetensors",
+    "SINGLE_FILE_CHECKPOINT_PATH": "D:/finetune/trainer/koeri_base.safetensors",
     "VAE_PATH": "",
     "OUTPUT_DIR": "D:/finetune/koeri/logsnr",
     "RESUME_MODEL_PATH": "",
@@ -12,7 +12,7 @@
     "NOISE_SCHEDULER": "DDPMScheduler",
     "PREDICTION_TYPE": "v_prediction",
     "BETA_SCHEDULE": "scaled_linear",
-    "MAX_TRAIN_STEPS": 2500,
+    "MAX_TRAIN_STEPS": 3000,
     "LEARNING_RATE": 1e-05,
     "BATCH_SIZE": 1,
     "GRADIENT_ACCUMULATION_STEPS": 16,
@@ -27,23 +27,23 @@
             5e-06
         ],
         [
-            0.08,
+            0.067,
             2e-05
         ],
         [
-            0.3,
+            0.35,
             1.8e-05
         ],
         [
-            0.5,
+            0.55,
             1.4e-05
         ],
         [
-            0.7,
+            0.75,
             8e-06
         ],
         [
-            0.85,
+            0.88,
             4e-06
         ],
         [
