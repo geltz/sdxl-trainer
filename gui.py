@@ -2303,7 +2303,11 @@ class DatasetManagerWidget(QtWidgets.QWidget):
                 caption_text = caption_text[:200] + "..."
             caption_label.setText(caption_text)
             caption_label.setWordWrap(True)
-            caption_label.setStyleSheet("color: #e0e0e0; font-size: 12px;")
+            caption_label.setStyleSheet("""
+                color: #1a2433;
+                font-size: 14px;
+                line-height: 1.2;
+            """)
             caption_label.setAlignment(QtCore.Qt.AlignmentFlag.AlignLeft | QtCore.Qt.AlignmentFlag.AlignTop)
             caption_layout.addWidget(caption_label, 1)
             
@@ -2453,4 +2457,5 @@ if __name__ == "__main__":
     app.setStyleSheet(STYLESHEET)
     main_win = TrainingGUI()
     main_win.show()
+
     sys.exit(app.exec())
