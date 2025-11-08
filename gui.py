@@ -1967,6 +1967,16 @@ class TrainingGUI(QtWidgets.QWidget):
             self.append_log(text, replace=is_progress and self.last_line_is_progress)
             self.last_line_is_progress = is_progress
 
+    def _handle_param_info(self, text: str) -> None:
+    """Update the parameter info label when the process sends an update."""
+    self.param_info_label.setText(text)
+
+    def emit_param_info(info_text: str) -> None:
+    """Print param info in the format the GUI watches for."""
+    print(f"GUI_PARAM_INFO::{info_text}", flush=True)
+
+    # emit_param_info(f"lr={lr} | step={step} | loss={loss:.4f}")
+
     def start_training(self):
         self.save_config()
         self.log("\n" + "="*50 + "\nStarting training process...\n" + "="*50)
@@ -1990,13 +2000,10 @@ class TrainingGUI(QtWidgets.QWidget):
         creation_flags = 0
         if os.name == 'nt':
             creation_flags = subprocess.CREATE_NEW_PROCESS_GROUP
-        self.process_runner = ProcessRunner(
-            executable=sys.executable,
-            args=["-u", train_py_path, "--config", config_path],
-            working_dir=script_dir,
-            env=env_dict,
-            creation_flags=creation_flags
-        )
+        
+        # connect info param signal
+        self.process_runner = ProcessRunner(exe, args, cwd, env)
+        
         self.process_runner.logSignal.connect(self.log)
         self.process_runner.paramInfoSignal.connect(lambda info: self.param_info_label.setText(f"Trainable Parameters: {info}"))
         self.process_runner.progressSignal.connect(self.handle_process_output)
@@ -2004,11 +2011,14 @@ class TrainingGUI(QtWidgets.QWidget):
         self.process_runner.errorSignal.connect(self.log)
         self.process_runner.metricsSignal.connect(self.live_metrics_widget.parse_and_update)
         
-        # NEW: Connect cache creation signal to update dataset UI
+        # connect cache creation signal to update dataset UI
         self.process_runner.cacheCreatedSignal.connect(self.dataset_manager.refresh_cache_buttons)
         
         if os.name == 'nt':
             prevent_sleep(True)
+
+        # connect
+        self.process_runner.paramInfoSignal.connect(self._handle_param_info)
         self.process_runner.start()
         self.log(f"INFO: Starting train.py with config: {config_path}")
     
@@ -2459,3 +2469,4 @@ if __name__ == "__main__":
     main_win.show()
 
     sys.exit(app.exec())
+
