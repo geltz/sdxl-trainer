@@ -8,3 +8,12 @@ Key changes:
 - RavenAdamW buffers stored in fp32.  
 - Offload frequency value.  
 - Neutral theme with squared borders.  
+
+Usage:
+
+`python -m venv venv`  
+(activate)
+`pip install -r requirements`
+`python gui.py`
+
+Adjust settings to whatever.    
