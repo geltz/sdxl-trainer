@@ -1084,7 +1084,7 @@ class TrainingGUI(QtWidgets.QWidget):
             default_save_path = os.path.join(self.config_dir, "default.json")
             with open(default_save_path, 'w') as f:
                 json.dump(self.default_config, f, indent=4)
-            self.log("No configs found. Created 'default.json'.")
+            print("No configs found. Created 'default.json'.")
         self.presets = {}
         for filename in os.listdir(self.config_dir):
             if filename.endswith(".json"):
@@ -1981,38 +1981,46 @@ class TrainingGUI(QtWidgets.QWidget):
         # gui_param_info(f"epoch={epoch} step={step} lr={lr} loss={loss:.4f}")
 
     def start_training(self):
-        """Start the training subprocess and connect all signals.
-        Safe against missing train_script_path/config_path attributes.
-        """
+        """Start the training subprocess and connect all signals."""
         if getattr(self, "process_runner", None) is not None:
-            # already running
             return
 
-        # tolerate older UIs where these widgets were never created
+        # existing code to get paths
         train_edit = getattr(self, "train_script_path", None)
         config_edit = getattr(self, "config_path", None)
 
         if train_edit is not None:
             train_py_path = train_edit.text().strip()
         else:
-            # fall back to a sane default so we do not crash
             import os
             train_py_path = os.path.join(os.getcwd(), "train.py")
 
+        # try textbox first
         if config_edit is not None:
             config_path = config_edit.text().strip()
         else:
             config_path = ""
 
+        # NEW: if user didn’t type a config, infer it from the dropdown
+        if not config_path:
+            import os
+            idx = self.config_dropdown.currentIndex()
+            if idx >= 0:
+                # same key logic you use in load_selected_config(...)
+                key = (
+                    self.config_dropdown.itemData(idx)
+                    or self.config_dropdown.itemText(idx).replace(" ", "_").lower()
+                )
+                cand = os.path.join(os.getcwd(), "configs", f"{key}.json")
+                if os.path.exists(cand):
+                    config_path = cand
+
         if not train_py_path:
-            # still nothing to run
             if hasattr(self, "log"):
                 self.log("No training script selected.")
             return
 
-        import os
-        import sys
-
+        import os, sys
         script_dir = os.path.dirname(train_py_path) if train_py_path else None
 
         exe = sys.executable
@@ -2024,6 +2032,7 @@ class TrainingGUI(QtWidgets.QWidget):
         cwd = script_dir or None
 
         self.process_runner = ProcessRunner(exe, args, cwd, env)
+
 
         # existing GUI connections
         self.process_runner.logSignal.connect(self.log)
@@ -2037,6 +2046,75 @@ class TrainingGUI(QtWidgets.QWidget):
         self.process_runner.start()
         if hasattr(self, "log"):
             self.log("[gui] training started\n")
+
+    def build_sdxl_pipeline(model_path, config):
+        """Wrapper used by train.py to guarantee a str path.
+        Call this instead of StableDiffusionXLPipeline.from_single_file(...) directly.
+        """
+        from diffusers import StableDiffusionXLPipeline
+        model_path = normalize_model_path(model_path)
+        return StableDiffusionXLPipeline.from_single_file(
+            model_path,
+            torch_dtype=config.compute_dtype,
+        )
+
+
+        # 1) caching pass if needed (Windows-safe for Path inputs)
+        if check_if_caching_needed(config):
+            print("INFO: Caching required. Loading VAE + text encoders...")
+            vae = load_vae_only(config, device)
+            if vae is None:
+                pipe = StableDiffusionXLPipeline.from_single_file(
+                    normalize_model_path(config.SINGLE_FILE_CHECKPOINT_PATH),
+                    torch_dtype=torch.float32,
+                    device_map=None,
+                )
+                tokenizer = pipe.tokenizer; tokenizer_2 = pipe.tokenizer_2
+                te1 = pipe.text_encoder; te2 = pipe.text_encoder_2
+                vae = pipe.vae.to(device); del pipe; gc.collect()
+            else:
+                pipe = StableDiffusionXLPipeline.from_single_file(
+                    normalize_model_path(config.SINGLE_FILE_CHECKPOINT_PATH),
+                    torch_dtype=config.compute_dtype,
+                )
+                tokenizer = pipe.tokenizer; tokenizer_2 = pipe.tokenizer_2
+                te1 = pipe.text_encoder; te2 = pipe.text_encoder_2
+                del pipe; gc.collect(); torch.cuda.empty_cache()
+            precompute_and_cache_latents(config, tokenizer, tokenizer_2, te1, te2, vae, device)
+            del tokenizer, tokenizer_2, te1, te2, vae; gc.collect(); torch.cuda.empty_cache()
+        else:
+            print("INFO: All datasets already cached. Skipping caching.")
+
+
+    def patch_diffusers_single_file():
+        """Globally force diffusers to accept pathlib.Path on Windows.
+        Call once at startup in train.py::main().
+        """
+        try:
+            from diffusers import StableDiffusionXLPipeline
+        except Exception:
+            return
+        orig = StableDiffusionXLPipeline.from_single_file
+
+        def _patched(path, *args, **kwargs):
+            from pathlib import Path
+            if isinstance(path, Path):
+                path = str(path)
+            return orig(path, *args, **kwargs)
+
+        StableDiffusionXLPipeline.from_single_file = _patched
+
+
+    def get_training_model_path(config):
+        """Centralized way to pick the correct model and normalize it.
+        Use this everywhere instead of touching config paths directly.
+        """
+        from pathlib import Path
+        if getattr(config, "RESUME_TRAINING", False) and getattr(config, "RESUME_MODEL_PATH", ""):
+            raw = Path(config.RESUME_MODEL_PATH)
+        else:
+            raw = getattr(config, "SINGLE_FILE_CHECKPOINT_PATH", "./model.safetensors")
+        return normalize_model_path(raw)
     
     def stop_training(self):
         if self.process_runner and self.process_runner.isRunning():

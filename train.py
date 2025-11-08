@@ -33,6 +33,43 @@ import multiprocessing
 import argparse
 import numpy as np
 
+import config as default_config
+
+# ----- model path helpers (must be defined before main) -----
+def normalize_model_path(pathlike):
+    """Return an existing absolute str path to the checkpoint."""
+    from pathlib import Path
+
+    p = pathlike if isinstance(pathlike, Path) else Path(str(pathlike))
+
+    # if a directory was given, assume model.safetensors inside it
+    if p.is_dir():
+        candidate = p / "model.safetensors"
+        if candidate.exists():
+            p = candidate
+
+    if not p.exists():
+        # try relative to this file
+        here = Path(__file__).resolve().parent
+        candidate = (here / p).resolve()
+        if candidate.exists():
+            p = candidate
+        else:
+            raise FileNotFoundError(f"Checkpoint file not found after resolving: {p}")
+
+    return str(p.resolve())
+
+def get_training_model_path(config):
+    # config is already JSON-merged by TrainingConfig.__init__()
+    if getattr(config, "RESUME_TRAINING", False) and getattr(config, "RESUME_MODEL_PATH", ""):
+        raw = config.RESUME_MODEL_PATH
+    elif getattr(config, "MODEL_PATH", ""):
+        raw = config.MODEL_PATH
+    else:
+        raw = getattr(config, "SINGLE_FILE_CHECKPOINT_PATH", "./model.safetensors")
+    return normalize_model_path(raw)
+
+
 # ==========================
 # Global settings
 # ==========================
@@ -87,50 +124,86 @@ def rescale_zero_terminal_snr(betas: torch.Tensor) -> torch.Tensor:
 # ==========================
 # Config wrapper
 # ==========================
+
 class TrainingConfig:
     def __init__(self):
-        # load defaults from config.py
+        # 1) load defaults from config.py
         for k, v in default_config.__dict__.items():
             if not k.startswith("__"):
                 setattr(self, k, v)
 
-        # override from json if provided
+        # 2) load external JSON if present
         self._load_user_json()
+
+        # 3) normalize types against config.py
         self._fix_types()
+
         self.compute_dtype = (
             torch.bfloat16 if self.MIXED_PRECISION == "bfloat16" else torch.float16
         )
 
     def _load_user_json(self):
+        import argparse
+        from pathlib import Path
+
         parser = argparse.ArgumentParser(add_help=False)
         parser.add_argument("--config", type=str, default=None)
         args, _ = parser.parse_known_args()
-        if not args.config:
+
+        cfg_path = None
+
+        if args.config:
+            cfg_path = Path(args.config)
+        else:
+            here = Path(__file__).resolve().parent          # D:\finetune\trainer
+            parent_dir = here.parent                        # D:\finetune
+            cwd = Path.cwd()                                # probably D:\finetune\trainer
+
+            search_roots = [here, parent_dir, cwd]
+
+            for root in search_roots:
+                for name in ("koeri.json", "config.json", "trainer.json"):
+                    cand = root / name
+                    if cand.exists():
+                        cfg_path = cand
+                        print(f"INFO: Auto-detected external JSON config: {cand}")
+                        break
+                if cfg_path:
+                    break
+
+        if not cfg_path:
             print("INFO: No external JSON config. Using config.py only.")
             return
-        path = Path(args.config)
-        if not path.exists():
-            print(f"WARNING: Config {path} not found. Skipping.")
+        if not cfg_path.exists():
+            print(f"WARNING: Config {cfg_path} not found. Skipping.")
             return
-        with open(path, "r", encoding="utf-8") as f:
+
+        with cfg_path.open("r", encoding="utf-8") as f:
             data = json.load(f)
+
         for k, v in data.items():
             setattr(self, k, v)
-        print(f"INFO: Loaded overrides from {path}")
+
+        # allow JSONs that only set MODEL_PATH
+        if getattr(self, "MODEL_PATH", None) and not getattr(self, "SINGLE_FILE_CHECKPOINT_PATH", None):
+            self.SINGLE_FILE_CHECKPOINT_PATH = self.MODEL_PATH
+
+        print(f"INFO: Loaded overrides from {cfg_path}")
 
     def _fix_types(self):
         print("INFO: Normalizing config types...")
+        base = default_config  # use the module we imported at the top
         for k, v in list(self.__dict__.items()):
-            if k == "UNET_EXCLUDE_TARGETS":
-                if isinstance(v, str):
-                    setattr(self, k, [s.strip() for s in v.split(",") if s.strip()])
+            # special case: string -> list
+            if k == "UNET_EXCLUDE_TARGETS" and isinstance(v, str):
+                setattr(self, k, [s.strip() for s in v.split(",") if s.strip()])
                 continue
-            dv = getattr(default_config, k, None)
+
+            dv = getattr(base, k, None)
             if dv is None:
                 continue
             if isinstance(v, type(dv)):
                 continue
-            # simple coercions
             if isinstance(dv, bool) and isinstance(v, str):
                 setattr(self, k, v.lower() in ("1", "true", "yes", "y"))
                 continue
@@ -140,10 +213,9 @@ class TrainingConfig:
                 else:
                     setattr(self, k, type(dv)(v))
             except Exception:
-                print(f"WARNING: Could not coerce {k}='{v}' to {type(dv)}. Using default.")
+                print(f"WARNING: Could not coerce {k}={v!r} to {type(dv)}; keeping default.")
                 setattr(self, k, dv)
         print("INFO: Config is ready.")
-
 
 # ==========================
 # Dataset + caching helpers
@@ -566,11 +638,29 @@ class TimestepSampler:
         if "Dynamic" in self.method:
             self.last_timestep_avg = timesteps.float().mean().item()
 
+# lil patch
+
+def patch_diffusers_single_file():
+    """Globally force diffusers to accept pathlib.Path on Windows."""
+    try:
+        from diffusers import StableDiffusionXLPipeline
+    except Exception:
+        return
+    orig = StableDiffusionXLPipeline.from_single_file
+
+    def _patched(path, *args, **kwargs):
+        from pathlib import Path
+        if isinstance(path, Path):
+            path = str(path)
+        return orig(path, *args, **kwargs)
+
+    StableDiffusionXLPipeline.from_single_file = _patched
 
 # ==========================
 # Main training entry
 # ==========================
 def main():
+    patch_diffusers_single_file()
     config = TrainingConfig()
     if config.SEED:
         set_seed(config.SEED)
@@ -579,13 +669,13 @@ def main():
     ckpt_dir = out_dir / "checkpoints"; ckpt_dir.mkdir(exist_ok=True)
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
-    # 1) caching pass if needed
+    # 1) caching pass if needed (Windows-safe for Path inputs)
     if check_if_caching_needed(config):
         print("INFO: Caching required. Loading VAE + text encoders...")
         vae = load_vae_only(config, device)
         if vae is None:
             pipe = StableDiffusionXLPipeline.from_single_file(
-                config.SINGLE_FILE_CHECKPOINT_PATH,
+                normalize_model_path(config.SINGLE_FILE_CHECKPOINT_PATH),
                 torch_dtype=torch.float32,
                 device_map=None,
             )
@@ -594,7 +684,7 @@ def main():
             vae = pipe.vae.to(device); del pipe; gc.collect()
         else:
             pipe = StableDiffusionXLPipeline.from_single_file(
-                config.SINGLE_FILE_CHECKPOINT_PATH,
+                normalize_model_path(config.SINGLE_FILE_CHECKPOINT_PATH),
                 torch_dtype=config.compute_dtype,
             )
             tokenizer = pipe.tokenizer; tokenizer_2 = pipe.tokenizer_2
@@ -605,19 +695,20 @@ def main():
     else:
         print("INFO: All datasets already cached. Skipping caching.")
 
+
     # 2) load pipeline for training
-    model_path = (
-        Path(config.RESUME_MODEL_PATH)
-        if config.RESUME_TRAINING and Path(config.RESUME_MODEL_PATH).exists()
-        else Path(config.SINGLE_FILE_CHECKPOINT_PATH)
-    )
+    model_path = get_training_model_path(config)
     print(f"Loading training UNet from {model_path}")
-    pipe = StableDiffusionXLPipeline.from_single_file(model_path, torch_dtype=config.compute_dtype)
+    pipe = StableDiffusionXLPipeline.from_single_file(
+        model_path,
+        torch_dtype=config.compute_dtype,
+    )
     orig_sched_cfg = pipe.scheduler.config
     unet = pipe.unet
     del pipe; gc.collect(); torch.cuda.empty_cache()
 
     base_model_sd = load_file(model_path)
+
 
     # 3) scheduler for training
     SCHED_MAP = {
