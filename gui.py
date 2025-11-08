@@ -1966,61 +1966,54 @@ class TrainingGUI(QtWidgets.QWidget):
         if text:
             self.append_log(text, replace=is_progress and self.last_line_is_progress)
             self.last_line_is_progress = is_progress
-
+            
     def _handle_param_info(self, text: str) -> None:
-    """Update the parameter info label when the process sends an update."""
-    self.param_info_label.setText(text)
+        """Slot connected to ProcessRunner.paramInfoSignal to update the UI label."""
+        if not text:
+            return
+        self.param_info_label.setText(text)
 
-    def emit_param_info(info_text: str) -> None:
-    """Print param info in the format the GUI watches for."""
-    print(f"GUI_PARAM_INFO::{info_text}", flush=True)
-
-    # emit_param_info(f"lr={lr} | step={step} | loss={loss:.4f}")
+    def gui_param_info(info: str) -> None:
+    """Emit parameter info in the format the GUI expects."""
+    print(f"GUI_PARAM_INFO::{info}", flush=True)
+    
+    # example usage inside training loop
+    # gui_param_info(f"epoch={epoch} step={step} lr={lr} loss={loss:.4f}")
 
     def start_training(self):
-        self.save_config()
-        self.log("\n" + "="*50 + "\nStarting training process...\n" + "="*50)
-        selected_key = self.config_dropdown.itemData(self.config_dropdown.currentIndex()) if self.config_dropdown.itemData(self.config_dropdown.currentIndex()) else self.config_dropdown.itemText(self.config_dropdown.currentIndex()).replace(" ", "_").lower()
-        config_path = os.path.join(self.config_dir, f"{selected_key}.json")
-        if not os.path.exists(config_path):
-            self.log(f"CRITICAL ERROR: Config file not found: {config_path}. Aborting.")
+        """Start the training subprocess and connect all signals."""
+        if self.process_runner is not None:
+            # already running
             return
-        script_dir = os.path.dirname(os.path.abspath(__file__))
-        config_path = os.path.abspath(config_path)
-        train_py_path = os.path.abspath("train.py")
-        self.start_button.setEnabled(False)
-        self.stop_button.setEnabled(True)
-        
-        self.live_metrics_widget.clear_data()
-        
-        env_dict = os.environ.copy()
-        python_dir = os.path.dirname(sys.executable)
-        env_dict["PATH"] = f"{python_dir};{os.path.join(python_dir, 'Scripts')};{env_dict.get('PATH', '')}"
-        env_dict["PYTHONPATH"] = f"{script_dir};{env_dict.get('PYTHONPATH', '')}"
-        creation_flags = 0
-        if os.name == 'nt':
-            creation_flags = subprocess.CREATE_NEW_PROCESS_GROUP
-        
-        # connect info param signal
+    
+        # build command
+        train_py_path = self.train_script_path.text().strip()
+        config_path = self.config_path.text().strip()
+        script_dir = os.path.dirname(train_py_path) if train_py_path else None
+    
+        exe = sys.executable
+        args = ["-u", train_py_path]
+        if config_path:
+            args.extend(["--config", config_path])
+    
+        env = os.environ.copy()
+        cwd = script_dir or None
+    
         self.process_runner = ProcessRunner(exe, args, cwd, env)
-        
+    
+        # existing GUI connections
         self.process_runner.logSignal.connect(self.log)
-        self.process_runner.paramInfoSignal.connect(lambda info: self.param_info_label.setText(f"Trainable Parameters: {info}"))
         self.process_runner.progressSignal.connect(self.handle_process_output)
+        self.process_runner.metricsSignal.connect(self.live_metrics_widget.parse_and_update)
         self.process_runner.finishedSignal.connect(self.training_finished)
         self.process_runner.errorSignal.connect(self.log)
-        self.process_runner.metricsSignal.connect(self.live_metrics_widget.parse_and_update)
-        
-        # connect cache creation signal to update dataset UI
         self.process_runner.cacheCreatedSignal.connect(self.dataset_manager.refresh_cache_buttons)
-        
-        if os.name == 'nt':
-            prevent_sleep(True)
-
-        # connect
+    
+        # parameter info updates
         self.process_runner.paramInfoSignal.connect(self._handle_param_info)
+    
         self.process_runner.start()
-        self.log(f"INFO: Starting train.py with config: {config_path}")
+        self.log("[gui] training started\n")
     
     def stop_training(self):
         if self.process_runner and self.process_runner.isRunning():
@@ -2469,4 +2462,5 @@ if __name__ == "__main__":
     main_win.show()
 
     sys.exit(app.exec())
+
 
