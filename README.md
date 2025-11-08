@@ -1,4 +1,4 @@
-This trainer allows to train SDXL checkpoints with 12 GB of VRAM as a strict minimum.
+ This trainer allows to train SDXL checkpoints with 12 GB of VRAM as a strict minimum.
 
 Modified from [Aozora](https://github.com/Hysocs/Aozora_SDXL_Training) for personal usage.    
 
@@ -12,7 +12,7 @@ Key changes:
 Usage:
 
 `python -m venv venv`    
-`./venv/scripts/activate`
+`./venv/scripts/activate`    
 `pip install -r requirements`    
 `python gui.py`  
 
