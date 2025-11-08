@@ -1972,13 +1972,13 @@ class TrainingGUI(QtWidgets.QWidget):
         if not text:
             return
         self.param_info_label.setText(text)
-
+        
     def gui_param_info(info: str) -> None:
-    """Emit parameter info in the format the GUI expects."""
-    print(f"GUI_PARAM_INFO::{info}", flush=True)
-    
-    # example usage inside training loop
-    # gui_param_info(f"epoch={epoch} step={step} lr={lr} loss={loss:.4f}")
+        """Emit parameter info in the format the GUI expects."""
+        print(f"GUI_PARAM_INFO::{info}", flush=True)
+        
+        # example usage inside training loop
+        # gui_param_info(f"epoch={epoch} step={step} lr={lr} loss={loss:.4f}")
 
     def start_training(self):
         """Start the training subprocess and connect all signals."""
@@ -2462,5 +2462,6 @@ if __name__ == "__main__":
     main_win.show()
 
     sys.exit(app.exec())
+
 
 
