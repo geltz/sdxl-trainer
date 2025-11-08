@@ -1696,11 +1696,11 @@ class TrainingGUI(QtWidgets.QWidget):
             layout.addRow(separator1)
 
             noise_heading = QtWidgets.QLabel("<b>Noise Enhancements</b>")
-            noise_heading.setStyleSheet("color: #ab97e6; margin-top: 5px;")
+            noise_heading.setStyleSheet("color: #7b98d1; margin-top: 5px;")
             layout.addRow(noise_heading)
             
             noise_info_label = QtWidgets.QLabel("<i>Techniques to improve learning on high-contrast or artistic datasets.</i>")
-            noise_info_label.setStyleSheet("color: #7a788c; font-size: 12px; margin-bottom: 5px;")
+            noise_info_label.setStyleSheet("color: #7b98d1; font-size: 12px; margin-bottom: 5px;")
             layout.addRow(noise_info_label)
 
             # --- Noise Enhancement Widgets ---
@@ -1728,7 +1728,7 @@ class TrainingGUI(QtWidgets.QWidget):
             layout.addRow(separator2)
 
             spike_heading = QtWidgets.QLabel("<b>Gradient Spike Detection</b>")
-            spike_heading.setStyleSheet("color: #ab97e6; margin-top: 5px;")
+            spike_heading.setStyleSheet("color: #7b98d1; margin-top: 5px;")
             layout.addRow(spike_heading)
 
             # --- Gradient Spike Detection Widgets ---
