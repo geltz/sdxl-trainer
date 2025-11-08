@@ -562,11 +562,11 @@ class TimestepSampler:
             self.log_snr_max = self.log_snr_per_t.max().item()
             
             # DEBUG: Confirm LogSNR setup
-            print(f"✓ LogSNR initialized successfully")
+            print(f"[OK] LogSNR initialized successfully")
             print(f"  - SNR range: [{self.log_snr_min:.4f}, {self.log_snr_max:.4f}]")
             print(f"  - Timesteps: {len(self.log_snr_per_t)}")
         else:
-            print(f"✗ LogSNR NOT initialized")
+            print(f"[FAIL] LogSNR NOT initialized")
             if self.use_log_snr:
                 print(f"  - Reason: scheduler missing alphas_cumprod")
         
