@@ -709,7 +709,7 @@ def main():
     ckpt_dir = out_dir / "checkpoints"; ckpt_dir.mkdir(exist_ok=True)
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
-    # 1) caching pass if needed (Windows-safe for Path inputs)
+    # 1) caching pass if needed
     if check_if_caching_needed(config):
         print("INFO: Caching required. Loading VAE + text encoders...")
         vae = load_vae_only(config, device)
@@ -735,7 +735,6 @@ def main():
     else:
         print("INFO: All datasets already cached. Skipping caching.")
 
-
     # 2) load pipeline for training
     model_path = get_training_model_path(config)
     print(f"Loading training UNet from {model_path}")
@@ -748,7 +747,6 @@ def main():
     del pipe; gc.collect(); torch.cuda.empty_cache()
 
     base_model_sd = load_file(model_path)
-
 
     # 3) scheduler for training
     SCHED_MAP = {
@@ -838,12 +836,10 @@ def main():
     scaler = torch.amp.GradScaler("cuda", enabled=use_scaler)
     is_v_pred = config.PREDICTION_TYPE == "v_prediction"
 
-    # pick param to watch
     watch_name = trainable_names[0]
     test_param = dict(unet.named_parameters())[watch_name]
     diagnostics = TrainingDiagnostics(config.GRADIENT_ACCUMULATION_STEPS, watch_name)
 
-    # noise print
     print("=" * 40)
     print("NOISE SETTINGS")
     if getattr(config, "USE_NOISE_OFFSET", False):
@@ -908,9 +904,10 @@ def main():
             scaler.scale(loss / config.GRADIENT_ACCUMULATION_STEPS).backward()
 
             if (global_step + 1) % config.GRADIENT_ACCUMULATION_STEPS == 0:
+                current_optim_step = (global_step + 1) // config.GRADIENT_ACCUMULATION_STEPS
                 before = test_param.data.clone()
                 scaler.unscale_(optimizer)
-                # grad norm
+                
                 raw_norm = 0.0
                 for p in params_to_opt:
                     if p.grad is not None:
@@ -926,10 +923,9 @@ def main():
 
                 timestep_sampler.update(raw_norm)
 
-                # anomaly report
                 if raw_norm > config.GRAD_SPIKE_THRESHOLD_HIGH or raw_norm < config.GRAD_SPIKE_THRESHOLD_LOW:
                     tqdm.write("\n=== GRADIENT ANOMALY DETECTED ===")
-                    tqdm.write(f"Step: {global_step + 1}")
+                    tqdm.write(f"Step: {current_optim_step}")
                     tqdm.write(f"Raw Grad Norm: {raw_norm:.4f}")
                     tqdm.write(f"Clipped Grad Norm: {clipped:.4f}")
                     for pth in accumulated_paths:
@@ -945,19 +941,17 @@ def main():
                 avg_loss = sum(diagnostics.losses) / len(diagnostics.losses) if diagnostics.losses else 0
                 pbar.set_postfix(loss=f"{avg_loss:.4f}")
 
-                diagnostics.report(global_step + 1, optimizer, raw_norm, clipped, before, after)
+                diagnostics.report(current_optim_step, optimizer, raw_norm, clipped, before, after)
 
-                if (global_step + 1) % config.SAVE_EVERY_N_STEPS == 0:
-                    current_optim_step = (global_step + 1) // config.GRADIENT_ACCUMULATION_STEPS
+                # FIXED: Check optimizer step count, not global_step
+                if current_optim_step % config.SAVE_EVERY_N_STEPS == 0:
                     ckpt_name = f"{Path(config.SINGLE_FILE_CHECKPOINT_PATH).stem}_step{current_optim_step}"
                     
-                    # Save state
                     torch.save(
                         {"step": current_optim_step, "optimizer_state_dict": optimizer.state_dict()},
                         ckpt_dir / f"{ckpt_name}_state.pt",
                     )
                     
-                    # Save model
                     ckpt_sd = base_model_sd.copy()
                     unet_sd = unet.state_dict()
                     key_map = _generate_hf_to_sd_unet_key_mapping(list(unet_sd.keys()))
@@ -1000,7 +994,6 @@ def main():
             final_sd[sd_key] = unet_sd[name].to(config.compute_dtype)
     save_file(final_sd, final_path)
     print(f"Final model saved to: {final_path}")
-
 
 # ==========================
 # Key mapping helper kept at end
