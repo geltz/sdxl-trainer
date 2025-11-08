@@ -11,9 +11,9 @@ Key changes:
 
 Usage:
 
-`python -m venv venv`  
-(activate)
-`pip install -r requirements`
-`python gui.py`
+`python -m venv venv`    
+(activate)  
+`pip install -r requirements`    
+`python gui.py`  
 
-Adjust settings to whatever.    
+Adjust settings to whatever. There is a config provided as an example.    
