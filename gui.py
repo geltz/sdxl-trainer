@@ -1972,7 +1972,7 @@ class TrainingGUI(QtWidgets.QWidget):
         if not text:
             return
         self.param_info_label.setText(text)
-        
+
     def gui_param_info(info: str) -> None:
         """Emit parameter info in the format the GUI expects."""
         print(f"GUI_PARAM_INFO::{info}", flush=True)
@@ -1981,26 +1981,50 @@ class TrainingGUI(QtWidgets.QWidget):
         # gui_param_info(f"epoch={epoch} step={step} lr={lr} loss={loss:.4f}")
 
     def start_training(self):
-        """Start the training subprocess and connect all signals."""
-        if self.process_runner is not None:
+        """Start the training subprocess and connect all signals.
+        Safe against missing train_script_path/config_path attributes.
+        """
+        if getattr(self, "process_runner", None) is not None:
             # already running
             return
-    
-        # build command
-        train_py_path = self.train_script_path.text().strip()
-        config_path = self.config_path.text().strip()
+
+        # tolerate older UIs where these widgets were never created
+        train_edit = getattr(self, "train_script_path", None)
+        config_edit = getattr(self, "config_path", None)
+
+        if train_edit is not None:
+            train_py_path = train_edit.text().strip()
+        else:
+            # fall back to a sane default so we do not crash
+            import os
+            train_py_path = os.path.join(os.getcwd(), "train.py")
+
+        if config_edit is not None:
+            config_path = config_edit.text().strip()
+        else:
+            config_path = ""
+
+        if not train_py_path:
+            # still nothing to run
+            if hasattr(self, "log"):
+                self.log("No training script selected.")
+            return
+
+        import os
+        import sys
+
         script_dir = os.path.dirname(train_py_path) if train_py_path else None
-    
+
         exe = sys.executable
         args = ["-u", train_py_path]
         if config_path:
             args.extend(["--config", config_path])
-    
+
         env = os.environ.copy()
         cwd = script_dir or None
-    
+
         self.process_runner = ProcessRunner(exe, args, cwd, env)
-    
+
         # existing GUI connections
         self.process_runner.logSignal.connect(self.log)
         self.process_runner.progressSignal.connect(self.handle_process_output)
@@ -2008,12 +2032,11 @@ class TrainingGUI(QtWidgets.QWidget):
         self.process_runner.finishedSignal.connect(self.training_finished)
         self.process_runner.errorSignal.connect(self.log)
         self.process_runner.cacheCreatedSignal.connect(self.dataset_manager.refresh_cache_buttons)
-    
-        # parameter info updates
         self.process_runner.paramInfoSignal.connect(self._handle_param_info)
-    
+
         self.process_runner.start()
-        self.log("[gui] training started\n")
+        if hasattr(self, "log"):
+            self.log("[gui] training started\n")
     
     def stop_training(self):
         if self.process_runner and self.process_runner.isRunning():
@@ -2462,6 +2485,5 @@ if __name__ == "__main__":
     main_win.show()
 
     sys.exit(app.exec())
-
 
 
