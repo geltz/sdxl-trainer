@@ -542,6 +542,14 @@ class TimestepSampler:
         
         self.use_log_snr = getattr(config, "USE_LOG_SNR", False)
         self.log_snr_per_t = None
+        
+        # DEBUG: Print LogSNR initialization
+        print(f"\n{'='*60}")
+        print(f"TIMESTEP SAMPLER INITIALIZATION")
+        print(f"{'='*60}")
+        print(f"Method: {self.method}")
+        print(f"USE_LOG_SNR flag: {self.use_log_snr}")
+        
         if self.use_log_snr and hasattr(self.scheduler, "alphas_cumprod"):
             alphas_cumprod = self.scheduler.alphas_cumprod
             if not torch.is_tensor(alphas_cumprod):
@@ -552,6 +560,17 @@ class TimestepSampler:
             self.log_snr_per_t = torch.log(alphas_cumprod / (1.0 - alphas_cumprod))
             self.log_snr_min = self.log_snr_per_t.min().item()
             self.log_snr_max = self.log_snr_per_t.max().item()
+            
+            # DEBUG: Confirm LogSNR setup
+            print(f"✓ LogSNR initialized successfully")
+            print(f"  - SNR range: [{self.log_snr_min:.4f}, {self.log_snr_max:.4f}]")
+            print(f"  - Timesteps: {len(self.log_snr_per_t)}")
+        else:
+            print(f"✗ LogSNR NOT initialized")
+            if self.use_log_snr:
+                print(f"  - Reason: scheduler missing alphas_cumprod")
+        
+        print(f"{'='*60}\n")
         
         # dynamic bounds
         self.current_min_ts = float(getattr(config, "TIMESTEP_SAMPLING_MIN", 0))
@@ -572,6 +591,15 @@ class TimestepSampler:
     def sample(self, batch_size: int):
         # LogSNR must be checked first
         if self.use_log_snr and self.method == "Uniform LogSNR" and self.log_snr_per_t is not None:
+            # DEBUG: Confirm we're using LogSNR path (only print once every 100 calls)
+            if not hasattr(self, '_logsnr_sample_count'):
+                self._logsnr_sample_count = 0
+                print(f"\n>>> Using Uniform LogSNR sampling <<<\n")
+            
+            self._logsnr_sample_count += 1
+            if self._logsnr_sample_count % 100 == 0:
+                print(f"[LogSNR] Sampled {self._logsnr_sample_count} batches")
+            
             u = torch.rand(batch_size, device=self.device)
             log_snr = self.log_snr_min + u * (self.log_snr_max - self.log_snr_min)
             diffs = (self.log_snr_per_t.view(1, -1) - log_snr.view(-1, 1)).abs()
@@ -580,18 +608,27 @@ class TimestepSampler:
         
         # uniform float
         if "Uniform Continuous" in self.method:
+            if not hasattr(self, '_uniform_msg_shown'):
+                self._uniform_msg_shown = True
+                print(f"\n>>> Using Uniform Continuous sampling <<<\n")
             t = torch.rand(batch_size, device=self.device)
             return (t * (self.num_train_timesteps - 1)).long()
         
         # dynamic window
         if "Dynamic" in self.method:
+            if not hasattr(self, '_dynamic_msg_shown'):
+                self._dynamic_msg_shown = True
+                print(f"\n>>> Using Dynamic windowed sampling <<<\n")
             mn = int(self.current_min_ts)
             mx = int(self.current_max_ts)
             if mn >= mx:
                 mn = max(0, mx - 1)
             return torch.randint(mn, mx + 1, (batch_size,), device=self.device)
         
-        # fallback: random integer
+        # fallback: random integer / fixed window
+        if not hasattr(self, '_fallback_msg_shown'):
+            self._fallback_msg_shown = True
+            print(f"\n>>> Using Random Integer sampling (fallback) <<<\n")
         mn = int(getattr(self.config, "TIMESTEP_SAMPLING_MIN", 0))
         mx = int(getattr(self.config, "TIMESTEP_SAMPLING_MAX", self.num_train_timesteps - 1))
         return torch.randint(mn, mx + 1, (batch_size,), device=self.device)

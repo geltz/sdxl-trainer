@@ -924,7 +924,7 @@ class ProcessRunner(QThread):
     finishedSignal = pyqtSignal(int)
     errorSignal = pyqtSignal(str)
     metricsSignal = pyqtSignal(str)
-    cacheCreatedSignal = pyqtSignal()  # NEW: Signal for cache creation
+    cacheCreatedSignal = pyqtSignal()
     
     def __init__(self, executable, args, working_dir, env=None, creation_flags=0):
         super().__init__()
@@ -941,6 +941,7 @@ class ProcessRunner(QThread):
             if os.name == 'nt':
                 # Remove CREATE_NEW_PROCESS_GROUP - it breaks terminate()
                 flags |= subprocess.HIGH_PRIORITY_CLASS
+            
             self.process = subprocess.Popen(
                 [self.executable] + self.args,
                 cwd=self.working_dir,
@@ -952,10 +953,12 @@ class ProcessRunner(QThread):
                 creationflags=flags
             )
             self.logSignal.emit(f"INFO: Started subprocess (PID: {self.process.pid})")
+            
             for line in iter(self.process.stdout.readline, ''):
                 line = line.strip()
                 if not line or "NOTE: Redirects are currently not supported" in line:
                     continue
+                
                 if line.startswith("GUI_PARAM_INFO::"):
                     self.paramInfoSignal.emit(line.replace('GUI_PARAM_INFO::', '').strip())
                 else:
@@ -968,7 +971,7 @@ class ProcessRunner(QThread):
                     # Emit for metrics parsing
                     self.metricsSignal.emit(line)
                     
-                    # NEW: Detect cache creation
+                    # Detect cache creation
                     if "saved latents cache" in line.lower() or "caching complete" in line.lower():
                         self.cacheCreatedSignal.emit()
             
@@ -982,8 +985,8 @@ class ProcessRunner(QThread):
         if self.process and self.process.poll() is None:
             try:
                 if os.name == 'nt':
-                    # Windows: must use CTRL_BREAK_EVENT with process groups
-                    self.process.send_signal(subprocess.signal.CTRL_BREAK_EVENT)
+                    # Windows: terminate directly (no process group needed now)
+                    self.process.terminate()
                 else:
                     self.process.terminate()
                 
@@ -992,10 +995,12 @@ class ProcessRunner(QThread):
                 # Wait for graceful shutdown
                 try:
                     self.process.wait(timeout=5)
+                    self.logSignal.emit("Process stopped gracefully.")
                 except subprocess.TimeoutExpired:
                     self.logSignal.emit("Force killing process...")
                     self.process.kill()
                     self.process.wait()
+                    self.logSignal.emit("Process killed.")
             except Exception as e:
                 self.logSignal.emit(f"Error stopping process: {e}")
                 try:
