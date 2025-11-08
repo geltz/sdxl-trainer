@@ -12,7 +12,7 @@ Key changes:
 Usage:
 
 `python -m venv venv`    
-(activate)  
+`./venv/scripts/activate`
 `pip install -r requirements`    
 `python gui.py`  
 
