@@ -13,7 +13,7 @@ Usage:
 
 `python -m venv venv`    
 `./venv/scripts/activate`    
-`pip install -r requirements`    
+`pip install -r requirements.txt`    
 `python gui.py`  
 
 Adjust settings to whatever. There is a config provided as an example.    
