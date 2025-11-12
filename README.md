@@ -1,4 +1,4 @@
-This can finetune SDXL checkpoints with 12 GB of VRAM as a strict minimum.
+This can train SDXL checkpoints with 12 GB of VRAM as a strict minimum.
 
 Modified from [Aozora](https://github.com/Hysocs/Aozora_SDXL_Training) for personal usage.    
 
