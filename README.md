@@ -19,4 +19,4 @@ Usage:
 `pip install -r requirements.txt`    
 `python gui.py`  
 
-Example configs are provided. Trainer will automatically generate a default one if there's none.  
+An example config is provided. Trainer will automatically generate a default one if there's none.  
