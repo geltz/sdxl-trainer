@@ -18,7 +18,7 @@
     "GRADIENT_ACCUMULATION_STEPS": 16,
     "MIXED_PRECISION": "bfloat16",
     "CLIP_GRAD_NORM": 1.0,
-    "SEED": 369,
+    "SEED": 42,
     "SAVE_EVERY_N_STEPS": 100,
     "UNET_EXCLUDE_TARGETS": "conv1, conv2, conv_in, conv_out",
     "LR_CUSTOM_CURVE": [
