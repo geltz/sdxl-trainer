@@ -1,3 +1,8 @@
+torch
+torchvision
+diffusers
+safetensors
+transformers
 Pillow
 tqdm
 numpy
