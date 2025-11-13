@@ -11,4 +11,5 @@ psutil
 pywin32
 scipy
 pandas
+PyQt6
 matplotlib
