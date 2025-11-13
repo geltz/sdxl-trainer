@@ -11,9 +11,9 @@ Key changes:
 
 Usage:
 
-`python -m venv venv`    
-`./venv/scripts/activate`
-`pip install -r requirements.txt`    
-`python gui.py`  
+`python -m venv venv`        
+`./venv/scripts/activate`    
+`pip install -r requirements.txt`      
+`python gui.py`    
 
 An example config is provided. Trainer will automatically generate a default one if there's none.  
