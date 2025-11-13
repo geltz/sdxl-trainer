@@ -13,7 +13,7 @@
     "PREDICTION_TYPE": "v_prediction",
     "BETA_SCHEDULE": "scaled_linear",
     "MAX_TRAIN_STEPS": 6000,
-    "LEARNING_RATE": 5e-05,
+    "LEARNING_RATE": 3e-05,
     "BATCH_SIZE": 1,
     "GRADIENT_ACCUMULATION_STEPS": 16,
     "MIXED_PRECISION": "bfloat16",
@@ -21,14 +21,26 @@
     "SEED": 333,
     "SAVE_EVERY_N_STEPS": 100,
     "UNET_EXCLUDE_TARGETS": "conv1, conv2, conv_in, conv_out",
-	"LR_CUSTOM_CURVE": [
-		[0.0, 2e-06],
-		[0.15, 5e-05],
-		[0.85, 5e-05],
-		[1.0, 1e-06]
-	],
+    "LR_CUSTOM_CURVE": [
+        [
+            0.0,
+            1.5e-06
+        ],
+        [
+            0.15,
+            3e-05
+        ],
+        [
+            0.85,
+            3e-05
+        ],
+        [
+            1.0,
+            8e-07
+        ]
+    ],
     "LR_GRAPH_MIN": 0.0,
-    "LR_GRAPH_MAX": 7e-05,
+    "LR_GRAPH_MAX": 5e-05,
     "MEMORY_EFFICIENT_ATTENTION": "sdpa",
     "USE_ZERO_TERMINAL_SNR": true,
     "GRAD_SPIKE_THRESHOLD_HIGH": 20.0,
