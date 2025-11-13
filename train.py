@@ -262,9 +262,13 @@ def check_if_caching_needed(config: TrainingConfig):
     for ds in config.INSTANCE_DATASETS:
         root = Path(ds["path"])
         if not root.exists():
+            print(f"WARNING: Dataset path does not exist: {root}")
+            needs = True  # Changed from continue
             continue
         imgs = [p for ext in [".jpg", ".jpeg", ".png", ".webp", ".bmp"] for p in root.rglob(f"*{ext}")]
         if not imgs:
+            print(f"WARNING: No images found in: {root}")
+            needs = True  # Changed from continue
             continue
         cache_dir = root / ".precomputed_embeddings_cache"
         if not cache_dir.exists():
@@ -1086,4 +1090,5 @@ if __name__ == "__main__":
     except RuntimeError:
         pass
     main()
+
 
