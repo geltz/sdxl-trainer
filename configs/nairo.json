@@ -1,7 +1,7 @@
 {
-    "SINGLE_FILE_CHECKPOINT_PATH": "D:/finetune/trainer/LS_Tiro_XL_vpred_v3_base.safetensors",
+    "SINGLE_FILE_CHECKPOINT_PATH": "LS_Tiro_XL_vpred_v3_base.safetensors",
     "VAE_PATH": "",
-    "OUTPUT_DIR": "D:/finetune/output",
+    "OUTPUT_DIR": "output",
     "RESUME_MODEL_PATH": "",
     "RESUME_STATE_PATH": "",
     "CACHING_BATCH_SIZE": 1,
@@ -21,14 +21,32 @@
     "SEED": 369,
     "SAVE_EVERY_N_STEPS": 100,
     "UNET_EXCLUDE_TARGETS": "conv1, conv2, conv_in, conv_out",
-	"LR_CUSTOM_CURVE": [
-		[0.0, 4e-6],
-		[0.12, 2e-5],
-		[0.6, 1.8e-5],
-		[0.85, 1e-5],
-		[0.95, 3e-6],
-		[1.0, 8e-7]
-	],
+    "LR_CUSTOM_CURVE": [
+        [
+            0.0,
+            4e-06
+        ],
+        [
+            0.12,
+            2e-05
+        ],
+        [
+            0.6,
+            1.8e-05
+        ],
+        [
+            0.85,
+            1e-05
+        ],
+        [
+            0.95,
+            3e-06
+        ],
+        [
+            1.0,
+            8e-07
+        ]
+    ],
     "LR_GRAPH_MIN": 0.0,
     "LR_GRAPH_MAX": 3e-05,
     "MEMORY_EFFICIENT_ATTENTION": "sdpa",
