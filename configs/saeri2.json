@@ -1,0 +1,90 @@
+{
+    "SINGLE_FILE_CHECKPOINT_PATH": "D:/sdxl-trainer/output/LS_Tiro_XL_vpred_v3_base_final.safetensors",
+    "VAE_PATH": "",
+    "OUTPUT_DIR": "D:/sdxl-trainer/output",
+    "RESUME_MODEL_PATH": "",
+    "RESUME_STATE_PATH": "",
+    "CACHING_BATCH_SIZE": 1,
+    "NUM_WORKERS": 0,
+    "SHOULD_UPSCALE": true,
+    "TARGET_PIXEL_AREA": 1048576,
+    "MAX_AREA_TOLERANCE": 1.0,
+    "NOISE_SCHEDULER": "DDPMScheduler",
+    "PREDICTION_TYPE": "v_prediction",
+    "BETA_SCHEDULE": "scaled_linear",
+    "MAX_TRAIN_STEPS": 2500,
+    "LEARNING_RATE": 8e-06,
+    "BATCH_SIZE": 1,
+    "GRADIENT_ACCUMULATION_STEPS": 16,
+    "MIXED_PRECISION": "bfloat16",
+    "CLIP_GRAD_NORM": 1.0,
+    "SEED": 369,
+    "SAVE_EVERY_N_STEPS": 100,
+    "UNET_EXCLUDE_TARGETS": "conv1, conv2, conv_in, conv_out",
+    "LR_CUSTOM_CURVE": [
+        [
+            0.0,
+            5e-07
+        ],
+        [
+            0.15,
+            8e-06
+        ],
+        [
+            0.8,
+            8e-06
+        ],
+        [
+            1.0,
+            1e-07
+        ]
+    ],
+    "LR_GRAPH_MIN": 0.0,
+    "LR_GRAPH_MAX": 1e-05,
+    "MEMORY_EFFICIENT_ATTENTION": "sdpa",
+    "USE_ZERO_TERMINAL_SNR": true,
+    "GRAD_SPIKE_THRESHOLD_HIGH": 25.0,
+    "GRAD_SPIKE_THRESHOLD_LOW": 0.06,
+    "USE_NOISE_OFFSET": false,
+    "NOISE_OFFSET": 0.0,
+    "USE_MULTISCALE_NOISE": false,
+    "TIMESTEP_SAMPLING_MIN": 0,
+    "TIMESTEP_SAMPLING_MAX": 999,
+    "TIMESTEP_SAMPLING_GRAD_MIN": 0.5,
+    "TIMESTEP_SAMPLING_GRAD_MAX": 2.0,
+    "USE_LOG_SNR": true,
+    "TIMESTEP_SAMPLING_METHOD": "Uniform LogSNR",
+    "RESUME_TRAINING": false,
+    "INSTANCE_DATASETS": [
+        {
+            "path": "D:/tagged",
+            "repeats": 1
+        }
+    ],
+    "OPTIMIZER_TYPE": "raven",
+    "RAVEN_PARAMS": {
+        "betas": [
+            0.9,
+            0.999
+        ],
+        "eps": 1e-08,
+        "weight_decay": 0.01,
+        "debias_strength": 1.0,
+        "use_grad_centralization": false,
+        "gc_alpha": 0.5,
+        "offload_frequency": 1
+    },
+    "ADAFACTOR_PARAMS": {
+        "eps": [
+            1e-30,
+            0.001
+        ],
+        "clip_threshold": 1.0,
+        "decay_rate": -0.8,
+        "beta1": null,
+        "weight_decay": 0.01,
+        "scale_parameter": true,
+        "relative_step": false,
+        "warmup_init": false
+    }
+}
