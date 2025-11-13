@@ -12,4 +12,3 @@ pywin32
 scipy
 pandas
 matplotlib
-xformers
