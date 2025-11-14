@@ -1013,6 +1013,7 @@ class TrainingGUI(QtWidgets.QWidget):
     UI_DEFINITIONS = {
         "SINGLE_FILE_CHECKPOINT_PATH": {"label": "Base Model (.safetensors)", "tooltip": "Path to the base SDXL model.", "widget": "Path", "file_type": "file_safetensors"},
         "VAE_PATH": {"label": "Separate VAE (Optional)", "tooltip": "Path to a separate VAE file. Leave empty to use the VAE from the base model.", "widget": "Path", "file_type": "file_safetensors"},
+        "USE_REFLECTION_PADDING": {"label": "Use Reflection Padding", "tooltip": "Enable for EQ-VAE or improved edge quality. Wraps conv layers to reduce border artifacts.", "widget": "QCheckBox"},
         "OUTPUT_DIR": {"label": "Output Directory", "tooltip": "Folder where checkpoints will be saved.", "widget": "Path", "file_type": "folder"},
         "CACHING_BATCH_SIZE": {"label": "Caching Batch Size", "tooltip": "Adjust based on VRAM (e.g., 2-8).", "widget": "QSpinBox", "range": (1, 64)},
         "NUM_WORKERS": {"label": "Dataloader Workers", "tooltip": "Set to 0 on Windows if you have issues.", "widget": "QSpinBox", "range": (0, 16)},
@@ -1471,6 +1472,8 @@ class TrainingGUI(QtWidgets.QWidget):
         label, widget = self._create_widget("SINGLE_FILE_CHECKPOINT_PATH")
         base_layout.addRow(label, widget)
         label, widget = self._create_widget("VAE_PATH")
+        base_layout.addRow(label, widget)
+        label, widget = self._create_widget("USE_REFLECTION_PADDING")
         base_layout.addRow(label, widget)
         path_layout.addRow(self.base_model_sub_widget)
         self.resume_sub_widget = QtWidgets.QWidget()

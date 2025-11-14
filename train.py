@@ -70,6 +70,38 @@ def get_training_model_path(config):
         raw = getattr(config, "SINGLE_FILE_CHECKPOINT_PATH", "./model.safetensors")
     return normalize_model_path(raw)
 
+def apply_reflection_padding_to_unet(unet, enabled=False):
+    """Wrap Conv2d layers with reflection padding if enabled."""
+    if not enabled:
+        return
+    
+    import torch.nn as nn
+    
+    modified_count = 0
+    for name, module in unet.named_modules():
+        if isinstance(module, nn.Conv2d) and module.padding != (0, 0):
+            # Get original padding
+            orig_pad = module.padding if isinstance(module.padding, tuple) else (module.padding, module.padding)
+            
+            # Only modify if padding > 0
+            if orig_pad[0] > 0 or orig_pad[1] > 0:
+                # Set conv padding to 0
+                module.padding = (0, 0)
+                
+                # Find parent module to insert ReflectionPad2d before conv
+                parent_name = '.'.join(name.split('.')[:-1])
+                parent = dict(unet.named_modules())[parent_name] if parent_name else unet
+                
+                # Replace with Sequential(ReflectionPad2d, Conv2d)
+                conv_name = name.split('.')[-1]
+                setattr(parent, conv_name, nn.Sequential(
+                    nn.ReflectionPad2d(orig_pad),
+                    module
+                ))
+                modified_count += 1
+    
+    if modified_count > 0:
+        print(f"INFO: Applied reflection padding to {modified_count} Conv2d layers")
 
 # ==========================
 # Global settings
@@ -860,6 +892,10 @@ def main():
     elif attn_mode == "sdpa":
         unet.set_attn_processor(AttnProcessor2_0()); print("INFO: SDPA enabled")
     unet.to(device); unet.enable_gradient_checkpointing()
+
+    # --- Apply reflection padding if enabled ---
+    if getattr(config, "USE_REFLECTION_PADDING", False):
+        apply_reflection_padding_to_unet(unet, enabled=True)
 
     # 6) sampler instance
     timestep_sampler = TimestepSampler(config, noise_scheduler, device)

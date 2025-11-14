@@ -6,6 +6,7 @@
 # --- Paths ---
 SINGLE_FILE_CHECKPOINT_PATH = "./model.safetensors"
 VAE_PATH = ""  # Optional separate VAE path, leave empty to use VAE from model
+USE_REFLECTION_PADDING = False  # Enable for EQ-VAE or better edge quality
 OUTPUT_DIR = "./output"
 
 # --- Resume Training ---
