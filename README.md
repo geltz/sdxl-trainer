@@ -4,7 +4,7 @@ Note: This is UNet-only, the text encoders are left as-is.
 
 Modified from [Aozora](https://github.com/Hysocs/Aozora_SDXL_Training) for personal usage.    
 
-Key changes:    
+Features:    
 
 - Uniform LogSNR and Logit Normal timestep sampling.
 - FlowMatchEulerDiscrete scheduler.
