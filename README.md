@@ -6,7 +6,8 @@ Modified from [Aozora](https://github.com/Hysocs/Aozora_SDXL_Training) for perso
 
 Key changes:    
 
-- Uniform LogSNR sampling for v-prediction.  
+- Uniform LogSNR and Logit Normal timestep sampling.
+- Flow Matching scheduler.
 - RavenAdamW buffers stored in fp32.  
 - Offload frequency value.  
 - Neutral theme with squared borders.  
