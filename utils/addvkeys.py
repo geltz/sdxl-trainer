@@ -5,8 +5,8 @@ add_vpred_ztsnr.py
 Add missing `v_pred` and `ztsnr` keys to an SDXL .safetensors model.
 
 Usage:
-    python add_vpred_ztsnr.py input.safetensors
-    python add_vpred_ztsnr.py input.safetensors --out output.safetensors
+    python addvkeys.py input.safetensors
+    python addvkeys.py input.safetensors --out output.safetensors
 """
 
 import argparse
@@ -72,3 +72,4 @@ def main():
 
 if __name__ == "__main__":
     main()
+
