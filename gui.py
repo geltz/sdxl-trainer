@@ -1668,7 +1668,7 @@ class TrainingGUI(QtWidgets.QWidget):
             "Any layer name containing these keywords will be frozen."
         )
         info_label.setWordWrap(True)
-        info_label.setStyleSheet("color: #e0e0e0; padding: 5px;")
+        info_label.setStyleSheet("color: #1a2433; padding: 5px;")
         layout.addWidget(info_label)
         
         label, widget = self._create_widget("UNET_EXCLUDE_TARGETS")
@@ -2587,5 +2587,6 @@ if __name__ == "__main__":
     main_win.show()
 
     sys.exit(app.exec())
+
 
 
