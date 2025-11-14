@@ -9,7 +9,8 @@ Key changes:
 - Uniform LogSNR and Logit Normal timestep sampling.
 - FlowMatchEulerDiscrete scheduler.
 - RavenAdamW buffers stored in fp32.  
-- Offload frequency value.  
+- Offload frequency value.
+- Optional reflection padding for EQ-VAE.    
 - Neutral theme with squared borders.  
 
 Usage:
