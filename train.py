@@ -21,6 +21,7 @@ from diffusers import (
     DDPMScheduler,
     DDIMScheduler,
     EulerDiscreteScheduler,
+    FlowMatchEulerDiscreteScheduler,
     AutoencoderKL,
 )
 from diffusers.models.attention_processor import AttnProcessor2_0
@@ -576,6 +577,10 @@ class TimestepSampler:
         
         print(f"{'='*60}\n")
         
+        # logit normal parameters
+        self.logit_normal_mean = float(getattr(config, "LOGIT_NORMAL_MEAN", 0.0))
+        self.logit_normal_std = float(getattr(config, "LOGIT_NORMAL_STD", 1.0))
+        
         # dynamic bounds
         self.current_min_ts = float(getattr(config, "TIMESTEP_SAMPLING_MIN", 0))
         self.current_max_ts = float(
@@ -609,6 +614,22 @@ class TimestepSampler:
             diffs = (self.log_snr_per_t.view(1, -1) - log_snr.view(-1, 1)).abs()
             idx = diffs.argmin(dim=1).long()
             return idx
+            
+        # logit normal
+        if "Logit Normal" in self.method:
+            if not hasattr(self, '_logit_msg_shown'):
+                self._logit_msg_shown = True
+                print(f"\n>>> Using Logit Normal sampling (μ={self.logit_normal_mean}, σ={self.logit_normal_std}) <<<\n")
+            
+            # Sample from normal distribution
+            z = torch.randn(batch_size, device=self.device) * self.logit_normal_std + self.logit_normal_mean
+            # Apply sigmoid to map to [0, 1]
+            u = torch.sigmoid(z)
+            # Scale to timestep range [0, num_train_timesteps-1]
+            t = (u * (self.num_train_timesteps - 1)).long()
+            # Clamp to valid range
+            t = torch.clamp(t, 0, self.num_train_timesteps - 1)
+            return t
         
         # uniform float
         if "Uniform Continuous" in self.method:
@@ -700,6 +721,23 @@ def patch_diffusers_single_file():
 
     StableDiffusionXLPipeline.from_single_file = _patched
 
+# flow stuff
+
+def add_flow_matching_noise(latents, noise, timesteps, scheduler):
+    """Add noise for flow matching training using the Euler ODE formulation."""
+    # Flow matching uses time in [0, 1], convert timesteps to sigmas
+    sigmas = scheduler.sigmas[timesteps].to(latents.device)
+    
+    # Reshape sigma for broadcasting
+    while len(sigmas.shape) < len(latents.shape):
+        sigmas = sigmas.unsqueeze(-1)
+    
+    # Flow matching: x_t = (1 - sigma) * x_0 + sigma * noise
+    # For rectified flow, this is: x_t = t * noise + (1 - t) * x_0
+    # With sigma representing the noise scale
+    noisy_latents = latents + sigmas * noise
+    return noisy_latents
+
 # ==========================
 # Main training entry
 # ==========================
@@ -753,19 +791,55 @@ def main():
     base_model_sd = load_file(model_path)
 
     # 3) scheduler for training
-    SCHED_MAP = {
-        "DDPMScheduler": DDPMScheduler,
-        "DDIMScheduler": DDIMScheduler,
-        "EulerDiscreteScheduler": EulerDiscreteScheduler,
-    }
+        SCHED_MAP = {
+            "DDPMScheduler": DDPMScheduler,
+            "DDIMScheduler": DDIMScheduler,
+            "EulerDiscreteScheduler": EulerDiscreteScheduler,
+            "FlowMatchEulerDiscreteScheduler": FlowMatchEulerDiscreteScheduler,
+        }
+    
     sched_name = getattr(config, "NOISE_SCHEDULER", "DDPMScheduler").replace(" (Experimental)", "")
+    
+    # Special handling for flow matching
+    is_flow_matching = config.PREDICTION_TYPE == "flow_matching"
+    if is_flow_matching and sched_name not in ["FlowMatchEulerDiscreteScheduler"]:
+        # If flow matching is selected but scheduler isn't FlowMatch, force it
+        print(f"WARNING: Flow matching requires FlowMatchEulerDiscreteScheduler. Overriding {sched_name}.")
+        sched_name = "FlowMatchEulerDiscreteScheduler"
+    elif not is_flow_matching and sched_name == "FlowMatchEulerDiscreteScheduler":
+        # If FlowMatch scheduler is selected but prediction type isn't flow_matching, warn
+        print(f"WARNING: FlowMatchEulerDiscreteScheduler requires prediction_type='flow_matching'. Switching to DDPMScheduler.")
+        sched_name = "DDPMScheduler"
+    
+    # Special handling for flow matching
+    is_flow_matching = config.PREDICTION_TYPE == "flow_matching"
+    if is_flow_matching:
+        sched_name = "FlowMatchEulerDiscreteScheduler"
+    
     sched_cls = SCHED_MAP.get(sched_name)
     if not sched_cls:
         raise ValueError(f"Unknown scheduler {sched_name}")
-    train_sched_cfg = orig_sched_cfg.copy(); train_sched_cfg["prediction_type"] = config.PREDICTION_TYPE
+    
+    train_sched_cfg = orig_sched_cfg.copy()
+    
+    if is_flow_matching:
+        # Flow matching specific config
+        train_sched_cfg["shift"] = getattr(config, "FLOW_MATCHING_SHIFT", 1.0) # default shift
+        train_sched_cfg["sigma_min"] = getattr(config, "FLOW_MATCHING_SIGMA_MIN", 0.002)
+        train_sched_cfg["sigma_max"] = getattr(config, "FLOW_MATCHING_SIGMA_MAX", 80.0)
+        # Remove incompatible keys
+        train_sched_cfg.pop("prediction_type", None)
+        train_sched_cfg.pop("beta_schedule", None)
+    else:
+        train_sched_cfg["prediction_type"] = config.PREDICTION_TYPE
+    
     train_sched_cfg = filter_scheduler_config(train_sched_cfg, sched_cls)
     noise_scheduler = sched_cls.from_config(train_sched_cfg)
-    print(f"INFO: Using scheduler {sched_cls.__name__} with pred type {noise_scheduler.config.prediction_type}")
+    
+    if is_flow_matching:
+        print(f"INFO: Using Flow Matching with {sched_cls.__name__}, sigma_min={noise_scheduler.config.sigma_min}, sigma_max={noise_scheduler.config.sigma_max}")
+    else:
+        print(f"INFO: Using scheduler {sched_cls.__name__} with pred type {noise_scheduler.config.prediction_type}")
 
     # 4) optional zero-terminal SNR
     if getattr(config, "USE_ZERO_TERMINAL_SNR", False) and hasattr(noise_scheduler, "betas"):
@@ -839,6 +913,7 @@ def main():
     use_scaler = is_fp32 and config.MIXED_PRECISION in ["float16", "fp16"]
     scaler = torch.amp.GradScaler("cuda", enabled=use_scaler)
     is_v_pred = config.PREDICTION_TYPE == "v_prediction"
+    is_flow_matching = config.PREDICTION_TYPE == "flow_matching"
 
     watch_name = trainable_names[0]
     test_param = dict(unet.named_parameters())[watch_name]
@@ -880,7 +955,7 @@ def main():
                     dim=0,
                 ).to(device, dtype=embeds.dtype)
 
-                if getattr(config, "USE_NOISE_OFFSET", False):
+            if getattr(config, "USE_NOISE_OFFSET", False):
                     noise = generate_offset_noise(latents, config)
                 else:
                     noise = torch.randn_like(latents)
@@ -888,12 +963,19 @@ def main():
                 timesteps = timestep_sampler.sample(latents.shape[0])
                 timestep_sampler.record_timesteps(timesteps)
 
-                noisy_latents = noise_scheduler.add_noise(latents, noise, timesteps)
-                target = (
-                    noise_scheduler.get_velocity(latents, noise, timesteps)
-                    if is_v_pred
-                    else noise
-                )
+                is_flow_matching = config.PREDICTION_TYPE == "flow_matching"
+                
+                if is_flow_matching:
+                    noisy_latents = add_flow_matching_noise(latents, noise, timesteps, noise_scheduler)
+                    # Flow matching target is the velocity field: noise - latents
+                    target = noise - latents
+                else:
+                    noisy_latents = noise_scheduler.add_noise(latents, noise, timesteps)
+                    target = (
+                        noise_scheduler.get_velocity(latents, noise, timesteps)
+                        if is_v_pred
+                        else noise
+                    )
 
                 pred = unet(
                     noisy_latents,
@@ -1090,5 +1172,4 @@ if __name__ == "__main__":
     except RuntimeError:
         pass
     main()
-
 

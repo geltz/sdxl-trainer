@@ -1019,7 +1019,10 @@ class TrainingGUI(QtWidgets.QWidget):
         "TARGET_PIXEL_AREA": {"label": "Target Pixel Area", "tooltip": "e.g., 1024*1024=1048576. Buckets are resolutions near this total area.", "widget": "QLineEdit"},
         "SHOULD_UPSCALE": {"label": "Upscale Images", "tooltip": "If enabled, upscale small images closer to bucket limit while maintaining aspect ratio.", "widget": "QCheckBox"},
         "MAX_AREA_Tolerance": {"label": "Max Area Tolerance:", "tooltip": "When upscaling, allow up to this multiplier over target area (e.g., 1.1 = 10% over).", "widget": "QLineEdit"},
-        "PREDICTION_TYPE": {"label": "Prediction Type:", "tooltip": "v_prediction or epsilon. Must match the base model.", "widget": "QComboBox", "options": ["v_prediction", "epsilon"]},
+        "PREDICTION_TYPE": {"label": "Prediction Type:", "tooltip": "v_prediction, epsilon, or flow_matching. Must match the base model training method.", "widget": "QComboBox", "options": ["v_prediction", "epsilon", "flow_matching"]},
+        "FLOW_MATCHING_SIGMA_MIN": {"label": "Flow σ Min:", "tooltip": "Minimum noise scale for flow matching (typically 0.002).", "widget": "QLineEdit"},
+        "FLOW_MATCHING_SIGMA_MAX": {"label": "Flow σ Max:", "tooltip": "Maximum noise scale for flow matching (typically 80.0).", "widget": "QLineEdit"},
+        "FLOW_MATCHING_SHIFT": {"label": "Flow Shift:", "tooltip": "Timestep shift for flow matching (1.0 for SDXL, 3.0 for SD3).", "widget": "QLineEdit"},
         "BETA_SCHEDULE": {"label": "Beta Schedule:", "tooltip": "Noise schedule for the diffuser.", "widget": "QComboBox", "options": ["scaled_linear", "linear", "squared", "squaredcos_cap_v2"]},
         "MAX_TRAIN_STEPS": {"label": "Max Training Steps:", "tooltip": "Total number of training steps.", "widget": "QLineEdit"},
         "LEARNING_RATE": {"label": "Base Learning Rate:", "tooltip": "The base learning rate (not used if custom curve is active, kept for future reference).", "widget": "QLineEdit"},
@@ -1034,7 +1037,7 @@ class TrainingGUI(QtWidgets.QWidget):
         "UNET_EXCLUDE_TARGETS": {"label": "Exclude Layers (Keywords):", "tooltip": "Comma-separated keywords for layers to exclude from training (e.g., 'conv1, conv2, norm').", "widget": "QLineEdit"},
         "LR_GRAPH_MIN": {"label": "Graph Min LR:", "tooltip": "The minimum learning rate displayed on the Y-axis.", "widget": "QLineEdit"},
         "LR_GRAPH_MAX": {"label": "Graph Max LR:", "tooltip": "The maximum learning rate displayed on the Y-axis.", "widget": "QLineEdit"},
-        "NOISE_SCHEDULER": {"label": "Noise Scheduler:", "tooltip": "The noise scheduler to use for training. EulerDiscrete is experimental.", "widget": "QComboBox", "options": ["DDPMScheduler", "DDIMScheduler", "EulerDiscreteScheduler (Experimental)"]},
+        "NOISE_SCHEDULER": {"label": "Noise Scheduler:", "tooltip": "The noise scheduler to use for training. EulerDiscrete is experimental. FlowMatch is for flow_matching prediction type only.", "widget": "QComboBox", "options": ["DDPMScheduler", "DDIMScheduler", "EulerDiscreteScheduler (Experimental)", "FlowMatchEulerDiscreteScheduler"]},
         "MEMORY_EFFICIENT_ATTENTION": {"label": "Attention Backend:", "tooltip": "Select the attention mechanism to use.", "widget": "QComboBox", "options": ["xformers", "sdpa"]},
         "USE_ZERO_TERMINAL_SNR": {"label": "Use Zero-Terminal SNR", "tooltip": "Rescale noise schedule for better dynamic range.", "widget": "QCheckBox"},
         "USE_LOG_SNR": {"label": "Sample in Log-SNR", "tooltip": "Sample training timesteps uniformly in log-SNR space.", "widget": "QCheckBox"},
@@ -1042,7 +1045,7 @@ class TrainingGUI(QtWidgets.QWidget):
             "label": "Timestep Sampling",
             "tooltip": "Select how to sample training timesteps.",
             "widget": "QComboBox",
-            "options": ["Dynamic", "Uniform Continuous", "Random Integer", "Uniform LogSNR"]
+            "options": ["Dynamic", "Uniform Continuous", "Random Integer", "Uniform LogSNR", "Logit Normal"]
         },
         "TIMESTEP_SAMPLING_MIN": {
             "label": "TS Min:",
@@ -1062,6 +1065,16 @@ class TrainingGUI(QtWidgets.QWidget):
         "TIMESTEP_SAMPLING_GRAD_MAX": {
             "label": "TS Grad Max:",
             "tooltip": "Dynamic mode: upper grad-norm bound.",
+            "widget": "QLineEdit"
+        },
+        "LOGIT_NORMAL_MEAN": {
+            "label": "Logit Normal μ:",
+            "tooltip": "Mean of the normal distribution before sigmoid (0.0 centers at timestep midpoint).",
+            "widget": "QLineEdit"
+        },
+        "LOGIT_NORMAL_STD": {
+            "label": "Logit Normal σ:",
+            "tooltip": "Standard deviation of normal distribution (1.0 gives good spread, higher = more extremes).",
             "widget": "QLineEdit"
         },
         "GRAD_SPIKE_THRESHOLD_HIGH": {"label": "Spike Threshold (High):", "tooltip": "Trigger detector if gradient norm exceeds this value.", "widget": "QLineEdit"},
@@ -1356,6 +1369,7 @@ class TrainingGUI(QtWidgets.QWidget):
         elif widget_type == "QCheckBox":
             widget = QtWidgets.QCheckBox()
             widget.stateChanged.connect(lambda state, k=key: self._update_config_from_widget(k, widget))
+            widget.buddy_label = label  # Store label reference
             self.widgets[key] = widget
             return label, widget
         elif widget_type == "Path":
@@ -1366,8 +1380,12 @@ class TrainingGUI(QtWidgets.QWidget):
             browse_btn.clicked.connect(lambda: self._browse_path(widget, definition["file_type"]))
             hbox.addWidget(widget, 1); hbox.addWidget(browse_btn)
             widget.textChanged.connect(lambda text, k=key: self._update_config_from_widget(k, widget))
+            widget.buddy_label = label  # Store label reference
             self.widgets[key] = widget
             return label, container
+        
+        if widget:
+            widget.buddy_label = label  # Store label reference
         self.widgets[key] = widget
         return label, widget
     
@@ -1472,7 +1490,10 @@ class TrainingGUI(QtWidgets.QWidget):
         core_group = QtWidgets.QGroupBox("Core Training Parameters")
         layout = QtWidgets.QFormLayout(core_group)
         core_keys = [
-            "PREDICTION_TYPE", 
+            "PREDICTION_TYPE",
+            "FLOW_MATCHING_SIGMA_MIN",
+            "FLOW_MATCHING_SIGMA_MAX",
+            "FLOW_MATCHING_SHIFT",
             "BETA_SCHEDULE", 
             "MAX_TRAIN_STEPS",
             "LEARNING_RATE",
@@ -1486,7 +1507,81 @@ class TrainingGUI(QtWidgets.QWidget):
         for key in core_keys:
             label, widget = self._create_widget(key)
             layout.addRow(label, widget)
+
+        # Connect prediction type changes to show/hide flow matching params
+        if "PREDICTION_TYPE" in self.widgets:
+            self.widgets["PREDICTION_TYPE"].currentTextChanged.connect(self._toggle_flow_matching_params)
+            self.widgets["PREDICTION_TYPE"].currentTextChanged.connect(self._validate_scheduler_prediction_compatibility)
+        
         return core_group
+        
+    def _toggle_flow_matching_params(self):
+        """Show/hide flow matching parameters based on prediction type."""
+        if "PREDICTION_TYPE" not in self.widgets:
+            return
+        
+        is_flow = self.widgets["PREDICTION_TYPE"].currentText() == "flow_matching"
+        
+        # Store references to widgets and their labels
+        flow_keys = ["FLOW_MATCHING_SIGMA_MIN", "FLOW_MATCHING_SIGMA_MAX", "FLOW_MATCHING_SHIFT"]
+        beta_keys = ["BETA_SCHEDULE"]
+        
+        # Toggle flow matching params
+        for key in flow_keys:
+            if key in self.widgets:
+                widget = self.widgets[key]
+                widget.setVisible(is_flow)
+                # Also hide the label (it's in the form layout at row index-1)
+                if hasattr(widget, 'buddy_label'):
+                    widget.buddy_label.setVisible(is_flow)
+        
+        # Toggle beta schedule (not used for flow matching)
+        for key in beta_keys:
+            if key in self.widgets:
+                widget = self.widgets[key]
+                widget.setVisible(not is_flow)
+                if hasattr(widget, 'buddy_label'):
+                    widget.buddy_label.setVisible(not is_flow)
+                    
+    def _validate_scheduler_prediction_compatibility(self):
+        """Warn if scheduler and prediction type are incompatible."""
+        if "PREDICTION_TYPE" not in self.widgets or "NOISE_SCHEDULER" not in self.widgets:
+            return
+        
+        pred_type = self.widgets["PREDICTION_TYPE"].currentText()
+        scheduler = self.widgets["NOISE_SCHEDULER"].currentText()
+        
+        if pred_type == "flow_matching" and "FlowMatch" not in scheduler:
+            self.log("WARNING: Flow matching prediction type should use FlowMatchEulerDiscreteScheduler")
+        elif pred_type != "flow_matching" and "FlowMatch" in scheduler:
+            self.log("WARNING: FlowMatchEulerDiscreteScheduler requires flow_matching prediction type")
+
+
+    def _toggle_timestep_sampling_params(self):
+        """Show/hide timestep sampling parameters based on selected method."""
+        if "TIMESTEP_SAMPLING_METHOD" not in self.widgets:
+            return
+        
+        method = self.widgets["TIMESTEP_SAMPLING_METHOD"].currentText()
+        
+        # Dynamic parameters
+        is_dynamic = "Dynamic" in method
+        for key in ["TIMESTEP_SAMPLING_GRAD_MIN", "TIMESTEP_SAMPLING_GRAD_MAX"]:
+            if key in self.widgets:
+                self.widgets[key].setVisible(is_dynamic)
+        
+        # Logit Normal parameters
+        is_logit = "Logit Normal" in method
+        for key in ["LOGIT_NORMAL_MEAN", "LOGIT_NORMAL_STD"]:
+            if key in self.widgets:
+                self.widgets[key].setVisible(is_logit)
+        
+        # Min/Max timesteps (used by most methods except Uniform Continuous and Logit Normal)
+        show_minmax = method not in ["Uniform Continuous", "Logit Normal"]
+        for key in ["TIMESTEP_SAMPLING_MIN", "TIMESTEP_SAMPLING_MAX"]:
+            if key in self.widgets:
+                self.widgets[key].setVisible(show_minmax)
+
 
     def _create_optimizer_group(self):
         optimizer_group = QtWidgets.QGroupBox("Optimizer")
@@ -1685,6 +1780,10 @@ class TrainingGUI(QtWidgets.QWidget):
             # --- General Advanced Settings ---
             label, widget = self._create_widget("NOISE_SCHEDULER")
             layout.addRow(label, widget)
+            
+            # Connect scheduler changes to validate compatibility
+            if "NOISE_SCHEDULER" in self.widgets:
+                self.widgets["NOISE_SCHEDULER"].currentTextChanged.connect(self._validate_scheduler_prediction_compatibility)
 
             label, widget = self._create_widget("MEMORY_EFFICIENT_ATTENTION")
             layout.addRow(label, widget)
@@ -1698,6 +1797,10 @@ class TrainingGUI(QtWidgets.QWidget):
             # --- timestep sampling fields ---
             label, widget = self._create_widget("TIMESTEP_SAMPLING_METHOD")
             layout.addRow(label, widget)
+            
+            # Connect to toggle visibility of related params
+            if "TIMESTEP_SAMPLING_METHOD" in self.widgets:
+                self.widgets["TIMESTEP_SAMPLING_METHOD"].currentTextChanged.connect(self._toggle_timestep_sampling_params)
 
             label, widget = self._create_widget("TIMESTEP_SAMPLING_MIN")
             layout.addRow(label, widget)
@@ -1709,6 +1812,12 @@ class TrainingGUI(QtWidgets.QWidget):
             layout.addRow(label, widget)
 
             label, widget = self._create_widget("TIMESTEP_SAMPLING_GRAD_MAX")
+            layout.addRow(label, widget)
+
+            label, widget = self._create_widget("LOGIT_NORMAL_MEAN")
+            layout.addRow(label, widget)
+            
+            label, widget = self._create_widget("LOGIT_NORMAL_STD")
             layout.addRow(label, widget)
 
             # --- Separator and Noise Enhancements Subheading ---
@@ -1875,6 +1984,8 @@ class TrainingGUI(QtWidgets.QWidget):
                     self._update_and_clamp_lr_graph()
                 
                 self._toggle_optimizer_widgets()
+                self._toggle_flow_matching_params()
+                self._toggle_timestep_sampling_params()
                 
                 if hasattr(self, "dataset_manager"):
                     datasets_config = self.current_config.get("INSTANCE_DATASETS", [])
@@ -2587,6 +2698,5 @@ if __name__ == "__main__":
     main_win.show()
 
     sys.exit(app.exec())
-
 
 

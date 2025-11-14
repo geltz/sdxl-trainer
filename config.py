@@ -30,8 +30,8 @@ TARGET_PIXEL_AREA = 1048576  # 1024*1024
 MAX_AREA_TOLERANCE = 1.1
 
 # --- Core Training Parameters ---
-NOISE_SCHEDULER = "DDPMScheduler"
-PREDICTION_TYPE = "v_prediction"
+NOISE_SCHEDULER = "DDPMScheduler"  # Options: "DDPMScheduler", "DDIMScheduler", "EulerDiscreteScheduler", "FlowMatchEulerDiscreteScheduler"
+PREDICTION_TYPE = "v_prediction"  # Options: "v_prediction", "epsilon", "flow_matching"
 BETA_SCHEDULE = "scaled_linear"
 MAX_TRAIN_STEPS = 6000
 LEARNING_RATE = 3e-6
@@ -40,6 +40,11 @@ GRADIENT_ACCUMULATION_STEPS = 4
 MIXED_PRECISION = "float16"
 CLIP_GRAD_NORM = 1.0
 SEED = 42
+
+# --- Flow Matching Parameters ---
+FLOW_MATCHING_SIGMA_MIN = 0.002
+FLOW_MATCHING_SIGMA_MAX = 80.0
+FLOW_MATCHING_SHIFT = 1.0  # Standard shift for SDXL flow matching
 
 # --- Saving ---
 SAVE_EVERY_N_STEPS = 100
@@ -103,4 +108,8 @@ TIMESTEP_SAMPLING_GRAD_MAX = 2.0
 
 USE_LOG_SNR = True
 
-TIMESTEP_SAMPLING_METHOD = "Uniform LogSNR"
+TIMESTEP_SAMPLING_METHOD = "Uniform LogSNR"  # Options: "Dynamic", "Uniform Continuous", "Random Integer", "Uniform LogSNR", "Logit Normal"
+
+# --- Logit Normal Sampling Parameters ---
+LOGIT_NORMAL_MEAN = 0.0
+LOGIT_NORMAL_STD = 1.0
