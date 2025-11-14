@@ -1,4 +1,5 @@
 This can train SDXL checkpoints with 12 GB of VRAM as a strict minimum.
+The text encoders are never utilized, this is for UNet-only.  
 
 Modified from [Aozora](https://github.com/Hysocs/Aozora_SDXL_Training) for personal usage.    
 
