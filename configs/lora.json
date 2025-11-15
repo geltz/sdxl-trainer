@@ -13,7 +13,7 @@
     "NOISE_SCHEDULER": "DDPMScheduler",
     "PREDICTION_TYPE": "v_prediction",
     "BETA_SCHEDULE": "scaled_linear",
-    "MAX_TRAIN_STEPS": 200,
+    "MAX_TRAIN_STEPS": 100,
     "LEARNING_RATE": 0.0001,
     "BATCH_SIZE": 1,
     "GRADIENT_ACCUMULATION_STEPS": 4,
@@ -73,7 +73,7 @@
     "RESUME_TRAINING": false,
     "INSTANCE_DATASETS": [
         {
-            "path": "C:/Users/aorav/Pictures/lora/topsecret/tag",
+            "path": "C:/Users/aorav/Pictures/lora/test/tag",
             "repeats": 1
         }
     ],
