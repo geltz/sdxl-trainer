@@ -87,6 +87,22 @@ def normalize_model_path(pathlike):
 
     return str(p.resolve())
 
+def apply_tag_dropout(caption: str, dropout_rate: float) -> str:
+    """Randomly drop tags from comma-separated caption."""
+    if dropout_rate <= 0 or not caption:
+        return caption
+    
+    tags = [t.strip() for t in caption.split(',')]
+    if len(tags) <= 1:
+        return caption  # Don't drop if only one tag
+    
+    # Keep at least one tag
+    kept_tags = [t for t in tags if random.random() > dropout_rate]
+    if not kept_tags:
+        kept_tags = [random.choice(tags)]
+    
+    return ', '.join(kept_tags)
+
 def get_training_model_path(config):
     # config is already JSON-merged by TrainingConfig.__init__()
     if getattr(config, "RESUME_TRAINING", False) and getattr(config, "RESUME_MODEL_PATH", ""):
@@ -411,12 +427,14 @@ def precompute_and_cache_latents(config: TrainingConfig, t1, t2, te1, te2, vae, 
             im = resize_to_fit(im, tw, th)
             img_tensor = transform(im).unsqueeze(0).to(device, dtype=torch.float32)
 
-            # caption
             cp = ip.with_suffix(".txt")
             if cp.exists():
                 caption = cp.read_text(encoding="utf-8").strip() or ip.stem.replace("_", " ")
             else:
                 caption = ip.stem.replace("_", " ")
+
+            # Apply tag dropout during caching
+            caption = apply_tag_dropout(caption, config.TAG_DROPOUT_RATE)
 
             embeds, pooled = compute_chunked_text_embeddings([caption], t1, t2, te1, te2, device)
             with torch.no_grad():

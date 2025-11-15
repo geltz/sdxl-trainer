@@ -1,4 +1,4 @@
-# ==================================================================================== 
+    # ==================================================================================== 
 # DEFAULT CONFIGURATION 
 # Simplified configuration matching the refactored training script
 # ====================================================================================
@@ -121,3 +121,6 @@ LORA_RANK = 16
 LORA_ALPHA = 16
 LORA_DROPOUT = 0.0
 LORA_TARGET_MODULES = ["to_q", "to_k", "to_v", "to_out.0"]
+
+# --- Dataset Configuration ---
+TAG_DROPOUT_RATE = 0.1  # 10% chance to drop each tag
