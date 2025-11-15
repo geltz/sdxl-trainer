@@ -9,8 +9,8 @@ Features:
 - Flow matching with FlowMatchEulerDiscrete scheduler.
 - RavenAdamW buffers stored in fp32.  
 - Optimizer state offload frequency.
-- Optional reflection padding for EQ-VAE.    
-- Neutral blue theme.
+- Optional reflection padding for EQ-VAE.
+- Improved GUI with neutral blue theme.    
 - Bonus utility scripts.    
 
 Usage:
