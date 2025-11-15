@@ -98,37 +98,33 @@ def get_training_model_path(config):
     return normalize_model_path(raw)
 
 def apply_reflection_padding_to_unet(unet, enabled=False):
-    """Wrap Conv2d layers with reflection padding if enabled."""
     if not enabled:
         return
     
     import torch.nn as nn
     
-    modified_count = 0
+    # Collect first, modify after
+    to_modify = []
     for name, module in unet.named_modules():
         if isinstance(module, nn.Conv2d) and module.padding != (0, 0):
-            # Get original padding
             orig_pad = module.padding if isinstance(module.padding, tuple) else (module.padding, module.padding)
-            
-            # Only modify if padding > 0
             if orig_pad[0] > 0 or orig_pad[1] > 0:
-                # Set conv padding to 0
-                module.padding = (0, 0)
-                
-                # Find parent module to insert ReflectionPad2d before conv
-                parent_name = '.'.join(name.split('.')[:-1])
-                parent = dict(unet.named_modules())[parent_name] if parent_name else unet
-                
-                # Replace with Sequential(ReflectionPad2d, Conv2d)
-                conv_name = name.split('.')[-1]
-                setattr(parent, conv_name, nn.Sequential(
-                    nn.ReflectionPad2d(orig_pad),
-                    module
-                ))
-                modified_count += 1
+                to_modify.append((name, module, orig_pad))
     
-    if modified_count > 0:
-        print(f"INFO: Applied reflection padding to {modified_count} Conv2d layers")
+    # Now modify
+    for name, module, orig_pad in to_modify:
+        module.padding = (0, 0)
+        parent_name = '.'.join(name.split('.')[:-1])
+        parent = dict(unet.named_modules())[parent_name] if parent_name else unet
+        conv_name = name.split('.')[-1]
+        
+        setattr(parent, conv_name, nn.Sequential(
+            nn.ReflectionPad2d(orig_pad),
+            module
+        ))
+    
+    if to_modify:
+        print(f"INFO: Applied reflection padding to {len(to_modify)} Conv2d layers")
 
 # ==========================
 # Global settings
@@ -783,18 +779,15 @@ def patch_diffusers_single_file():
 # flow stuff
 
 def add_flow_matching_noise(latents, noise, timesteps, scheduler):
-    """Add noise for flow matching training using the Euler ODE formulation."""
-    # Flow matching uses time in [0, 1], convert timesteps to sigmas
-    sigmas = scheduler.sigmas[timesteps].to(latents.device)
+    # Get normalized time in [0, 1]
+    t = timesteps.float() / (scheduler.config.num_train_timesteps - 1)
     
-    # Reshape sigma for broadcasting
-    while len(sigmas.shape) < len(latents.shape):
-        sigmas = sigmas.unsqueeze(-1)
+    # Reshape for broadcasting
+    while len(t.shape) < len(latents.shape):
+        t = t.unsqueeze(-1)
     
-    # Flow matching: x_t = (1 - sigma) * x_0 + sigma * noise
-    # For rectified flow, this is: x_t = t * noise + (1 - t) * x_0
-    # With sigma representing the noise scale
-    noisy_latents = latents + sigmas * noise
+    # Flow matching: x_t = (1 - t) * x_0 + t * noise
+    noisy_latents = (1.0 - t) * latents + t * noise
     return noisy_latents
 
 # ==========================
@@ -1068,17 +1061,13 @@ def main():
 
                 is_flow_matching = config.PREDICTION_TYPE == "flow_matching"
                 
+                # target: noise - noisy_latents
                 if is_flow_matching:
                     noisy_latents = add_flow_matching_noise(latents, noise, timesteps, noise_scheduler)
-                    # Flow matching target is the velocity field: noise - latents
-                    target = noise - latents
+                    target = noise - noisy_latents  # Velocity from current position
                 else:
                     noisy_latents = noise_scheduler.add_noise(latents, noise, timesteps)
-                    target = (
-                        noise_scheduler.get_velocity(latents, noise, timesteps)
-                        if is_v_pred
-                        else noise
-                    )
+                    target = noise_scheduler.get_velocity(latents, noise, timesteps) if is_v_pred else noise
 
                 pred = unet(
                     noisy_latents,
@@ -1153,6 +1142,11 @@ def main():
                         lora_state = extract_lora_state_dict_comfy_peft(unet)
                         pt_path = ckpt_dir / f"{ckpt_name}_lora.pt"
                         torch.save(lora_state, pt_path)
+                        # Key check
+                        print(f"\nSaved {len(lora_state)} keys")
+                        print("First 5 keys:")
+                        for k in list(lora_state.keys())[:5]:
+                            print(f"  {k}")
                         print(f"\nSaved LoRA checkpoint at step {current_optim_step}")
                         
                         # Auto-convert to safetensors
