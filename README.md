@@ -17,9 +17,9 @@ Features:
 Usage:
 
 `git clone https://github.com/geltz/sdxl-trainer`  
-`python -m venv venv`        
+`python -m venv venv` or use uv: `uv venv venv`    
 `./venv/scripts/activate`    
-`pip install -r requirements.txt`      
+`pip install -r requirements.txt` or use uv here    
 `python gui.py`    
 
 If you want to run headless:  
