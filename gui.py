@@ -1661,7 +1661,7 @@ class TrainingGUI(QtWidgets.QWidget):
         return group
     
     def _create_path_group(self):
-        path_group = QtWidgets.QGroupBox("File & Directory Paths")
+        path_group = QtWidgets.QGroupBox("Directory Paths")
         path_layout = QtWidgets.QFormLayout(path_group)
         self.model_load_strategy_combo = QtWidgets.QComboBox()
         self.model_load_strategy_combo.addItems(["Load Base Model", "Resume from Checkpoint"])
