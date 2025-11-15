@@ -25,37 +25,40 @@ def inject_lora_into_unet(unet, rank: int, alpha: float, dropout: float, target_
     """Inject LoRA layers into UNet."""
     lora_layers = []
     
+    # Collect target modules first
+    targets = []
     for name, module in unet.named_modules():
         if any(target in name for target in target_modules) and isinstance(module, nn.Linear):
-            # Create LoRA layer
-            lora = LoRALinearLayer(
-                module.in_features,
-                module.out_features,
-                rank,
-                alpha,
-                dropout
-            )
-            
-            # Store original forward and LoRA
-            module._original_forward = module.forward
-            module.lora = lora
-            
-            # Create new forward that uses stored _original_forward
-            def make_lora_forward(lora_layer):
-                def forward(self, x):
-                    return self._original_forward(x) + lora_layer(x)
-                return forward
-            
-            # Bind the method
-            import types
-            module.forward = types.MethodType(make_lora_forward(lora), module)
-            
-            # Freeze original weights
-            module.weight.requires_grad = False
-            if module.bias is not None:
-                module.bias.requires_grad = False
-            
-            lora_layers.append((name, lora))
+            targets.append((name, module))
+    
+    # Now modify them
+    for name, module in targets:
+        lora = LoRALinearLayer(
+            module.in_features,
+            module.out_features,
+            rank,
+            alpha,
+            dropout
+        )
+        
+        # Store original forward
+        original_forward = module.forward
+        
+        # Create wrapper
+        def make_forward(orig, lora_layer):
+            def forward(x):
+                return orig(x) + lora_layer(x)
+            return forward
+        
+        module.forward = make_forward(original_forward, lora)
+        module.lora = lora
+        
+        # Freeze original
+        module.weight.requires_grad = False
+        if module.bias is not None:
+            module.bias.requires_grad = False
+        
+        lora_layers.append((name, lora))
     
     print(f"Injected LoRA into {len(lora_layers)} layers")
     return lora_layers
