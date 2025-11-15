@@ -1116,7 +1116,13 @@ def main():
 
                 timestep_sampler.update(raw_norm)
 
-                if raw_norm > config.GRAD_SPIKE_THRESHOLD_HIGH or raw_norm < config.GRAD_SPIKE_THRESHOLD_LOW:
+                is_grad_anomaly = (
+                    raw_norm > config.GRAD_SPIKE_THRESHOLD_HIGH
+                    or raw_norm < config.GRAD_SPIKE_THRESHOLD_LOW
+                )
+
+                # Only log anomalies when *not* in LoRA mode
+                if is_grad_anomaly and not use_lora:
                     tqdm.write("\n=== GRADIENT ANOMALY DETECTED ===")
                     tqdm.write(f"Step: {current_optim_step}")
                     tqdm.write(f"Raw Grad Norm: {raw_norm:.4f}")
@@ -1124,6 +1130,7 @@ def main():
                     for pth in accumulated_paths:
                         tqdm.write(f"  - {Path(pth).stem}")
                     tqdm.write("===============================\n")
+
 
                 scaler.step(optimizer)
                 scaler.update()
