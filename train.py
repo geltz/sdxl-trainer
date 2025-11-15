@@ -87,7 +87,7 @@ def normalize_model_path(pathlike):
 
     return str(p.resolve())
 
-def apply_tag_dropout(caption: str, dropout_rate: float, whitelist: list) -> str:
+def apply_tag_dropout(caption: str, dropout_rate: float, whitelist: list, log_samples: bool = True) -> str:
     """Randomly drop tags from comma-separated caption, preserving whitelisted tags.
     Whitelist supports wildcards: *girl* matches '1girl', '2girls', etc.
     """
@@ -105,7 +105,6 @@ def apply_tag_dropout(caption: str, dropout_rate: float, whitelist: list) -> str
             pattern_lower = pattern.lower()
             
             if '*' in pattern_lower:
-                # Convert wildcard to regex: *girl* -> .*girl.*
                 import re
                 regex_pattern = '^' + pattern_lower.replace('*', '.*') + '$'
                 if re.match(regex_pattern, tag_lower):
@@ -117,21 +116,43 @@ def apply_tag_dropout(caption: str, dropout_rate: float, whitelist: list) -> str
     
     kept_tags = []
     droppable_tags = []
+    whitelisted_tags = []
     
     for tag in tags:
         if matches_whitelist(tag, whitelist):
-            kept_tags.append(tag)  # Always keep whitelisted
+            kept_tags.append(tag)
+            whitelisted_tags.append(tag)
         else:
             droppable_tags.append(tag)
     
     # Apply dropout to non-whitelisted tags
-    kept_tags.extend([t for t in droppable_tags if random.random() > dropout_rate])
+    dropped = []
+    for t in droppable_tags:
+        if random.random() > dropout_rate:
+            kept_tags.append(t)
+        else:
+            dropped.append(t)
     
     # Ensure at least one tag remains
     if not kept_tags:
         kept_tags = [random.choice(tags)]
     
-    return ', '.join(kept_tags)
+    result = ', '.join(kept_tags)
+    
+    # Log first 5 samples to verify behavior
+    if log_samples and hasattr(apply_tag_dropout, '_sample_count'):
+        apply_tag_dropout._sample_count += 1
+        if apply_tag_dropout._sample_count <= 5:
+            print(f"\n[Tag Dropout Sample #{apply_tag_dropout._sample_count}]")
+            print(f"  Original: {caption}")
+            print(f"  Whitelisted: {whitelisted_tags if whitelisted_tags else 'none'}")
+            print(f"  Dropped: {dropped if dropped else 'none'}")
+            print(f"  Result: {result}")
+    
+    return result
+
+# Initialize counter
+apply_tag_dropout._sample_count = 0
 
 def get_training_model_path(config):
     # config is already JSON-merged by TrainingConfig.__init__()
@@ -465,7 +486,7 @@ def precompute_and_cache_latents(config: TrainingConfig, t1, t2, te1, te2, vae, 
 
             # Apply tag dropout during caching
             whitelist = [w.strip() for w in config.TAG_DROPOUT_WHITELIST.split(',') if w.strip()]
-            caption = apply_tag_dropout(caption, config.TAG_DROPOUT_RATE, whitelist)
+            caption = apply_tag_dropout(caption, config.TAG_DROPOUT_RATE, whitelist, log_samples=True)
 
             embeds, pooled = compute_chunked_text_embeddings([caption], t1, t2, te1, te2, device)
             with torch.no_grad():
@@ -483,6 +504,13 @@ def precompute_and_cache_latents(config: TrainingConfig, t1, t2, te1, te2, vae, 
             )
 
         te1.cpu(); te2.cpu(); gc.collect(); torch.cuda.empty_cache()
+        
+        # Log tag dropout summary
+        if config.TAG_DROPOUT_RATE > 0:
+            print(f"\nTag Dropout Summary for {root}:")
+            print(f"  Dropout rate: {config.TAG_DROPOUT_RATE * 100:.0f}%")
+            print(f"  Whitelist: {config.TAG_DROPOUT_WHITELIST or 'none'}")
+            print(f"  Cached {len(todo)} captions with dropout applied")
 
 
 class ImageTextLatentDataset(Dataset):
