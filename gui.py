@@ -31,7 +31,7 @@ def prevent_sleep(enable=True):
 STYLESHEET = """
 QWidget {
     background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
-                                stop:0 #dde1eb, stop:0.45 #e0e4ed, stop:1 #e8ecf0);
+                                stop:0 #dde1e8, stop:0.45 #e0e4ed, stop:1 #e8ecf0);
     color: #4a5568;
     font-family: 'Segoe UI', 'SF Pro Display', -apple-system, BlinkMacSystemFont, system-ui, sans-serif;
     font-size: 14px;
@@ -310,8 +310,8 @@ class GraphPanel(QtWidgets.QWidget):
         
         # Display settings - UPDATED COLORS
         self.padding = {'top': 35, 'bottom': 40, 'left': 70, 'right': 20}
-        self.bg_color = QtGui.QColor("#dde1eb")
-        self.graph_bg_color = QtGui.QColor("#f8fafc")
+        self.bg_color = QtGui.QColor("#dde1e8")
+        self.graph_bg_color = QtGui.QColor("#dde1e8")
         self.grid_color = QtGui.QColor("#b0c4d4")
         self.text_color = QtGui.QColor("#4a5568")
         self.title_color = QtGui.QColor("#5a6e82")
@@ -599,7 +599,7 @@ class LiveMetricsWidget(QtWidgets.QWidget):
         control_layout.addStretch()
         
         self.stats_label = QtWidgets.QLabel("No data yet")
-        self.stats_label.setStyleSheet("color: #ab97e6; font-weight: bold;")
+        self.stats_label.setStyleSheet("color: #4a5568; font-weight: bold;")
         control_layout.addWidget(self.stats_label)
         
         layout.addLayout(control_layout)
@@ -772,7 +772,7 @@ class LRCurveWidget(QtWidgets.QWidget):
         self._dragging_point_index = -1
         self._selected_point_index = -1
         # UPDATED COLORS
-        self.bg_color = QtGui.QColor("#dde1eb")
+        self.bg_color = QtGui.QColor("#dde1e8")
         self.grid_color = QtGui.QColor("#b0c4d4")
         self.epoch_grid_color = QtGui.QColor("#a0aec0")
         self.line_color = QtGui.QColor("#7a8ea4")
@@ -2772,7 +2772,7 @@ class DatasetManagerWidget(QtWidgets.QWidget):
             
             preview_label = QtWidgets.QLabel()
             preview_label.setFixedSize(183, 183)
-            preview_label.setStyleSheet("border: 1px solid #8fa8c7; background-color: #e8eff7;")
+            preview_label.setStyleSheet("border: 1px solid #8fa8c7; background-color: #f8fafc;")
             preview_label.setAlignment(QtCore.Qt.AlignmentFlag.AlignCenter)
             preview_label.setScaledContents(False)
             
@@ -2829,7 +2829,7 @@ class DatasetManagerWidget(QtWidgets.QWidget):
             caption_container = QtWidgets.QWidget()
             caption_container.setStyleSheet("""
                 QWidget {
-                    background-color: #e8eff7;
+                    background-color: #f8fafc;
                     border: 1px solid #8fa8c7;
                     border-radius: 0px;
                 }
