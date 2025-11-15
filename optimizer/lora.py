@@ -1,36 +1,3 @@
-"""
-PEFT-based LoRA utilities for training Stable Diffusion UNet models and
-exporting adapters in a format that ComfyUI can consume.
-
-This file provides two independent LoRA implementations:
-
-1. A simple, manual LoRA injector (LoRALinearLayer + inject_lora_into_unet)
-   which works directly on nn.Linear modules. This is kept for backwards
-   compatibility with older training scripts.
-
-2. A PEFT-based implementation (inject_lora_peft + extract_lora_state_dict_comfy_peft)
-   that uses `peft.LoraConfig` and `peft.get_peft_model` and then converts
-   the resulting LoRA weights to the `lora_unet_*` key format ComfyUI expects.
-
-Typical usage with PEFT
------------------------
-
-    from lora import inject_lora_peft, extract_lora_state_dict_comfy_peft
-    from safetensors.torch import save_file
-
-    # 1. Wrap your diffusers UNet2DConditionModel with PEFT
-    unet = inject_lora_peft(unet, config)
-
-    # 2. Train as usual (optimizer only sees LoRA parameters)
-
-    # 3. After training, extract and save a ComfyUI-compatible LoRA:
-    lora_state = extract_lora_state_dict_comfy_peft(unet)
-    save_file(lora_state, "my_lora_for_comfyui.safetensors")
-
-The resulting file can be dropped into `ComfyUI/models/loras` and used with the
-standard "Load LoRA" node.
-"""
-
 from __future__ import annotations
 
 from dataclasses import dataclass
@@ -331,60 +298,31 @@ def extract_lora_state_dict_comfy_peft(
     key_prefix: str = "lora_unet",
     to_cpu: bool = True,
 ) -> Dict[str, torch.Tensor]:
-    """Extract a ComfyUI-compatible LoRA state_dict from a PEFT-wrapped UNet.
-
-    This converts PEFT keys of the form
-
-        down_blocks.0.attentions.0.transformer_blocks.0.attn1.to_q.lora_A.default.weight
-        down_blocks.0.attentions.0.transformer_blocks.0.attn1.to_q.lora_B.default.weight
-
-    into ComfyUI keys like
-
-        lora_unet_down_blocks_0_attentions_0_transformer_blocks_0_attn1_to_q.lora_down.weight
-        lora_unet_down_blocks_0_attentions_0_transformer_blocks_0_attn1_to_q.lora_up.weight
-        lora_unet_down_blocks_0_attentions_0_transformer_blocks_0_attn1_to_q.alpha
-
-    which match the `model_lora_keys_unet()` conventions in ComfyUI's
-    `comfy/lora.py` and therefore load without "lora key not loaded" warnings.
-
-    Parameters
-    ----------
-    model:
-        PEFT-wrapped UNet model returned by `inject_lora_peft`.
-    key_prefix:
-        Prefix for UNet keys; for Stable Diffusion UNets this should stay at
-        the default "lora_unet".
-    to_cpu:
-        If True (default), all tensors are moved to CPU before returning so
-        they can be safely written with `safetensors.torch.save_file`.
-
-    Returns
-    -------
-    Dict[str, torch.Tensor]
-        State dict ready to be written as a `.safetensors` file for ComfyUI.
-    """
+    """Extract ComfyUI-compatible LoRA from PEFT-wrapped UNet."""
     alpha = _get_lora_alpha_from_peft_model(model)
     lora_state: Dict[str, torch.Tensor] = {}
+    
+    # Map to track unique base keys to avoid duplicate alpha entries
+    processed_bases = set()
 
     for full_key, tensor in _iter_peft_lora_tensors(model):
+        # Determine if this is lora_A (down) or lora_B (up)
         if ".lora_A" in full_key:
-            base_name, _, _ = full_key.partition(".lora_A")
+            base_name, _, remainder = full_key.partition(".lora_A")
             kind = "down"
         elif ".lora_B" in full_key:
-            base_name, _, _ = full_key.partition(".lora_B")
+            base_name, _, remainder = full_key.partition(".lora_B")
             kind = "up"
         else:
-            # Shouldn't happen due to filter, but keep it robust
             continue
 
-        # Strip an optional leading "unet." so we match the diffusers-style keys
-        if base_name.startswith("unet."):
-            base_name = base_name[len("unet.") :]
+        # Strip leading "base_model.model." or "unet." prefixes that PEFT adds
+        if base_name.startswith("base_model.model."):
+            base_name = base_name[len("base_model.model."):]
+        elif base_name.startswith("unet."):
+            base_name = base_name[len("unet."):]
 
-        # Convert the module path into the `lora_unet_*` style name used by ComfyUI
-        # Example:
-        #   "down_blocks.0.attentions.0.transformer_blocks.0.attn1.to_q"
-        #   -> "lora_unet_down_blocks_0_attentions_0_transformer_blocks_0_attn1_to_q"
+        # ComfyUI key format: lora_unet_<module_path_with_underscores>
         comfy_base = f"{key_prefix}_{base_name.replace('.', '_')}"
 
         if to_cpu:
@@ -392,18 +330,26 @@ def extract_lora_state_dict_comfy_peft(
         else:
             tensor = tensor.detach()
 
+        # Add the weight tensors
         if kind == "down":
             lora_state[f"{comfy_base}.lora_down.weight"] = tensor
         elif kind == "up":
             lora_state[f"{comfy_base}.lora_up.weight"] = tensor
 
-        # Save a per-layer alpha so ComfyUI can reconstruct the scaling factor.
-        # We only need to write it once per base key.
-        if alpha is not None:
-            alpha_key = f"{comfy_base}.alpha"
-            if alpha_key not in lora_state:
-                lora_state[alpha_key] = torch.tensor(float(alpha))
+        # Add alpha once per base key
+        if alpha is not None and comfy_base not in processed_bases:
+            lora_state[f"{comfy_base}.alpha"] = torch.tensor(float(alpha))
+            processed_bases.add(comfy_base)
 
+    print(f"[LoRA Export] Exported {len(processed_bases)} LoRA layers for ComfyUI")
+    
+    # Debug: print first few keys
+    sample_keys = list(lora_state.keys())[:6]
+    if sample_keys:
+        print("[LoRA Export] Sample keys:")
+        for k in sample_keys:
+            print(f"  {k}")
+    
     return lora_state
 
 
