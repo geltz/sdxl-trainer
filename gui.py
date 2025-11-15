@@ -1083,6 +1083,10 @@ class TrainingGUI(QtWidgets.QWidget):
         "USE_NOISE_OFFSET": {"label": "Use Noise Offset", "tooltip": "Enable to add noise offset, improving learning of very dark/bright images.", "widget": "QCheckBox"},
         "NOISE_OFFSET": {"label": "Noise Offset:", "tooltip": "Improves learning of very dark/bright images. Range: 0.0-0.15. Try 0.05 first, 0.1 for high-contrast styles.", "widget": "QLineEdit"},
         "USE_MULTISCALE_NOISE": {"label": "Use Multiscale Noise", "tooltip": "Adds coarse-scale noise patterns to improve texture learning. Works well with noise offset.", "widget": "QCheckBox"},
+        "USE_LORA": {"label": "LoRA Mode", "tooltip": "Train a LoRA instead of full model", "widget": "QCheckBox"},
+        "LORA_RANK": {"label": "LoRA Rank:", "tooltip": "Rank of LoRA matrices (4-128)", "widget": "QSpinBox", "range": (1, 128)},
+        "LORA_ALPHA": {"label": "LoRA Alpha:", "tooltip": "Scaling factor (typically = rank)", "widget": "QSpinBox", "range": (1, 128)},
+        "LORA_DROPOUT": {"label": "LoRA Dropout:", "tooltip": "Dropout rate (0.0-0.5)", "widget": "QLineEdit"},
     }
     def __init__(self):
         super().__init__()
@@ -1623,8 +1627,6 @@ class TrainingGUI(QtWidgets.QWidget):
         self.widgets['RAVEN_gc_alpha'].setSingleStep(0.1)
         self.widgets['RAVEN_gc_alpha'].setDecimals(1)
         self.widgets['RAVEN_gc_alpha'].setToolTip("Strength of gradient centralization. 1.0 = full strength, 0.5 = half strength.")
-        
-        # Add this in _create_optimizer_group() after the gc_alpha widget:
 
         self.widgets['RAVEN_offload_frequency'] = QtWidgets.QSpinBox()
         self.widgets['RAVEN_offload_frequency'].setRange(1, 10)
@@ -1697,7 +1699,39 @@ class TrainingGUI(QtWidgets.QWidget):
         adafactor_layout.addRow(self.widgets['ADAFACTOR_warmup_init'])
         
         main_layout.addWidget(self.adafactor_settings_group)
-        
+
+        # --- LoRA Section ---
+        separator = QtWidgets.QFrame()
+        separator.setFrameShape(QtWidgets.QFrame.Shape.HLine)
+        separator.setStyleSheet("border: 1px solid #8fa8c7; margin: 10px 0;")
+        main_layout.addWidget(separator)
+
+        lora_container = QtWidgets.QWidget()
+        lora_layout = QtWidgets.QVBoxLayout(lora_container)
+        lora_layout.setContentsMargins(0, 0, 0, 0)
+
+        # Toggle
+        label, widget = self._create_widget("USE_LORA")
+        toggle_layout = QtWidgets.QHBoxLayout()
+        toggle_layout.addWidget(label)
+        toggle_layout.addWidget(widget)
+        toggle_layout.addStretch()
+        lora_layout.addLayout(toggle_layout)
+
+        # Settings group
+        self.lora_settings_group = QtWidgets.QGroupBox("LoRA Settings")
+        lora_settings_layout = QtWidgets.QFormLayout(self.lora_settings_group)
+
+        for key in ["LORA_RANK", "LORA_ALPHA", "LORA_DROPOUT"]:
+            label, widget = self._create_widget(key)
+            lora_settings_layout.addRow(label, widget)
+
+        lora_layout.addWidget(self.lora_settings_group)
+        main_layout.addWidget(lora_container)
+
+        # Connect toggle
+        self.widgets["USE_LORA"].stateChanged.connect(self._toggle_lora_widgets)
+
         return optimizer_group
     
     def _toggle_optimizer_widgets(self):
@@ -1705,6 +1739,10 @@ class TrainingGUI(QtWidgets.QWidget):
         is_raven = (selected_optimizer == "Raven")
         self.raven_settings_group.setVisible(is_raven)
         self.adafactor_settings_group.setVisible(not is_raven)
+
+    def _toggle_lora_widgets(self):
+        is_lora = self.widgets["USE_LORA"].isChecked()
+        self.lora_settings_group.setVisible(is_lora)
 
     def _create_lr_scheduler_group(self):
         lr_group = QtWidgets.QGroupBox("Learning Rate Scheduler")
@@ -1987,6 +2025,7 @@ class TrainingGUI(QtWidgets.QWidget):
                     self._update_and_clamp_lr_graph()
                 
                 self._toggle_optimizer_widgets()
+                self._toggle_lora_widgets()
                 self._toggle_flow_matching_params()
                 self._toggle_timestep_sampling_params()
                 

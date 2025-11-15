@@ -114,3 +114,10 @@ TIMESTEP_SAMPLING_METHOD = "Uniform LogSNR"  # Options: "Dynamic", "Uniform Cont
 # --- Logit Normal Sampling Parameters ---
 LOGIT_NORMAL_MEAN = 0.0
 LOGIT_NORMAL_STD = 1.0
+
+# --- LoRA Configuration ---
+USE_LORA = False
+LORA_RANK = 16
+LORA_ALPHA = 16
+LORA_DROPOUT = 0.0
+LORA_TARGET_MODULES = ["to_q", "to_k", "to_v", "to_out.0"]

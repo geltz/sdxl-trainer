@@ -36,6 +36,8 @@ import numpy as np
 
 import config as default_config
 
+from optimizer.lora import inject_lora_into_unet, extract_lora_state_dict
+
 # ----- model path helpers (must be defined before main) -----
 def normalize_model_path(pathlike):
     """Return an existing absolute str path to the checkpoint."""
@@ -901,21 +903,61 @@ def main():
     timestep_sampler = TimestepSampler(config, noise_scheduler, device)
     print(f"--- Using Timestep Sampling: {timestep_sampler.method} ---")
 
-    # 7) param selection
-    trainable_names, frozen_names = [], []
-    for name, param in unet.named_parameters():
-        param.requires_grad = True
-        if any(ex in name for ex in config.UNET_EXCLUDE_TARGETS):
-            param.requires_grad = False; frozen_names.append(name)
-        else:
-            trainable_names.append(name)
-    params_to_opt = [p for p in unet.parameters() if p.requires_grad]
-    total_params = sum(p.numel() for p in unet.parameters())
-    train_params = sum(p.numel() for p in params_to_opt)
-    print(f"Total UNet params: {total_params / 1e6:.2f}M")
-    print(f"Trainable params: {train_params / 1e6:.2f}M ({train_params/total_params*100:.2f}%)")
+    # 7) param selection / LoRA injection
+    use_lora = getattr(config, "USE_LORA", False)
+    lora_layers = []
+
+    if use_lora:
+        print("=" * 40)
+        print("LoRA MODE ENABLED")
+        print("=" * 40)
+        
+        # Freeze all UNet params first
+        for param in unet.parameters():
+            param.requires_grad = False
+        
+        # Inject LoRA
+        lora_layers = inject_lora_into_unet(
+            unet,
+            rank=getattr(config, "LORA_RANK", 16),
+            alpha=getattr(config, "LORA_ALPHA", 16),
+            dropout=getattr(config, "LORA_DROPOUT", 0.0),
+            target_modules=getattr(config, "LORA_TARGET_MODULES", ["to_q", "to_k", "to_v", "to_out.0"])
+        )
+        
+        # Collect LoRA params
+        params_to_opt = []
+        for name, lora in lora_layers:
+            params_to_opt.extend([p for p in lora.parameters() if p.requires_grad])
+        
+        train_params = sum(p.numel() for p in params_to_opt)
+        total_params = sum(p.numel() for p in unet.parameters())
+        
+        print(f"Total UNet params: {total_params / 1e6:.2f}M")
+        print(f"Trainable LoRA params: {train_params / 1e6:.2f}M ({train_params/total_params*100:.4f}%)")
+        
+        trainable_names = [name for name, _ in lora_layers]
+        frozen_names = []
+    else:
+        # Original full-model training
+        trainable_names, frozen_names = [], []
+        for name, param in unet.named_parameters():
+            param.requires_grad = True
+            if any(ex in name for ex in config.UNET_EXCLUDE_TARGETS):
+                param.requires_grad = False
+                frozen_names.append(name)
+            else:
+                trainable_names.append(name)
+        
+        params_to_opt = [p for p in unet.parameters() if p.requires_grad]
+        total_params = sum(p.numel() for p in unet.parameters())
+        train_params = sum(p.numel() for p in params_to_opt)
+        
+        print(f"Total UNet params: {total_params / 1e6:.2f}M")
+        print(f"Trainable params: {train_params / 1e6:.2f}M ({train_params/total_params*100:.2f}%)")
+
     if not params_to_opt:
-        raise ValueError("No parameters selected for training. Check UNET_EXCLUDE_TARGETS.")
+        raise ValueError("No parameters selected for training.")
 
     # 8) optimizer + LR
     optimizer = create_optimizer(config, params_to_opt)
@@ -1065,7 +1107,7 @@ def main():
 
                 diagnostics.report(current_optim_step, optimizer, raw_norm, clipped, before, after)
 
-                # FIXED: Check optimizer step count, not global_step
+                # Inside accumulation loop (around line 720)
                 if current_optim_step % config.SAVE_EVERY_N_STEPS == 0:
                     ckpt_name = f"{Path(config.SINGLE_FILE_CHECKPOINT_PATH).stem}_step{current_optim_step}"
                     
@@ -1074,18 +1116,25 @@ def main():
                         ckpt_dir / f"{ckpt_name}_state.pt",
                     )
                     
-                    ckpt_sd = base_model_sd.copy()
-                    unet_sd = unet.state_dict()
-                    key_map = _generate_hf_to_sd_unet_key_mapping(list(unet_sd.keys()))
-                    for name in trainable_names:
-                        mapped = key_map.get(name)
-                        if mapped:
-                            sd_key = "model.diffusion_model." + mapped
-                            if sd_key in ckpt_sd:
-                                ckpt_sd[sd_key] = unet_sd[name].to(config.compute_dtype)
-                    
-                    save_file(ckpt_sd, ckpt_dir / f"{ckpt_name}.safetensors")
-                    print(f"\nSaved checkpoint at step {current_optim_step}")
+                    if use_lora:
+                        # Save LoRA weights
+                        lora_state = extract_lora_state_dict(unet)
+                        torch.save(lora_state, ckpt_dir / f"{ckpt_name}_lora.pt")
+                        print(f"\nSaved LoRA checkpoint at step {current_optim_step}")
+                    else:
+                        # Save full model
+                        ckpt_sd = base_model_sd.copy()
+                        unet_sd = unet.state_dict()
+                        key_map = _generate_hf_to_sd_unet_key_mapping(list(unet_sd.keys()))
+                        for name in trainable_names:
+                            mapped = key_map.get(name)
+                            if mapped:
+                                sd_key = "model.diffusion_model." + mapped
+                                if sd_key in ckpt_sd:
+                                    ckpt_sd[sd_key] = unet_sd[name].to(config.compute_dtype)
+                        
+                        save_file(ckpt_sd, ckpt_dir / f"{ckpt_name}.safetensors")
+                        print(f"\nSaved checkpoint at step {current_optim_step}")
                 
                 accumulated_paths.clear()
 
@@ -1095,27 +1144,36 @@ def main():
     pbar.close()
     print("\nTraining complete.")
 
-    # 12) final save
     final_optim_step = global_step // config.GRADIENT_ACCUMULATION_STEPS
     base_name = f"{Path(config.SINGLE_FILE_CHECKPOINT_PATH).stem}_final"
     print("Saving final model and state...")
+
     torch.save(
         {"step": final_optim_step, "optimizer_state_dict": optimizer.state_dict()},
         out_dir / f"{base_name}_state.pt",
     )
-    final_path = out_dir / f"{base_name}.safetensors"
-    final_sd = base_model_sd.copy()
-    unet_sd = unet.state_dict()
-    key_map = _generate_hf_to_sd_unet_key_mapping(list(unet_sd.keys()))
-    for name in trainable_names:
-        mapped = key_map.get(name)
-        if not mapped:
-            continue
-        sd_key = "model.diffusion_model." + mapped
-        if sd_key in final_sd:
-            final_sd[sd_key] = unet_sd[name].to(config.compute_dtype)
-    save_file(final_sd, final_path)
-    print(f"Final model saved to: {final_path}")
+
+    if use_lora:
+        # Save LoRA
+        lora_state = extract_lora_state_dict(unet)
+        final_path = out_dir / f"{base_name}_lora.pt"
+        torch.save(lora_state, final_path)
+        print(f"Final LoRA saved to: {final_path}")
+    else:
+        # Save full model
+        final_path = out_dir / f"{base_name}.safetensors"
+        final_sd = base_model_sd.copy()
+        unet_sd = unet.state_dict()
+        key_map = _generate_hf_to_sd_unet_key_mapping(list(unet_sd.keys()))
+        for name in trainable_names:
+            mapped = key_map.get(name)
+            if not mapped:
+                continue
+            sd_key = "model.diffusion_model." + mapped
+            if sd_key in final_sd:
+                final_sd[sd_key] = unet_sd[name].to(config.compute_dtype)
+        save_file(final_sd, final_path)
+        print(f"Final model saved to: {final_path}")
 
 # ==========================
 # Key mapping helper kept at end
