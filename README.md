@@ -10,7 +10,8 @@ Features:
 - Optimizer buffers stored in fp32.  
 - Optimizer state offload frequency.
 - Optional reflection padding for EQ-VAE.
-- Improved GUI with neutral blue theme.    
+- Improved GUI with neutral blue theme.
+- Headless mode via cli wrapper.     
 - Bonus utility scripts.    
 
 Usage:
