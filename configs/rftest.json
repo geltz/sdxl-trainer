@@ -1,8 +1,8 @@
 {
-    "SINGLE_FILE_CHECKPOINT_PATH": "C:/Users/aorav/Desktop/sdxl-trainer/NoobAI-RectifiedFlow-test-step486k.safetensors",
+    "SINGLE_FILE_CHECKPOINT_PATH": "NoobAI-RectifiedFlow-test-step486k.safetensors",
     "VAE_PATH": "",
     "USE_REFLECTION_PADDING": true,
-    "OUTPUT_DIR": "C:/Users/aorav/Desktop/sdxl-trainer",
+    "OUTPUT_DIR": "sdxl-trainer",
     "RESUME_MODEL_PATH": "",
     "RESUME_STATE_PATH": "",
     "CACHING_BATCH_SIZE": 1,
@@ -73,7 +73,7 @@
     "RESUME_TRAINING": false,
     "INSTANCE_DATASETS": [
         {
-            "path": "D:/tagged",
+            "path": "tagged",
             "repeats": 1
         }
     ],

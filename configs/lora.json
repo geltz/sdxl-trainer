@@ -73,7 +73,7 @@
     "RESUME_TRAINING": false,
     "INSTANCE_DATASETS": [
         {
-            "path": "C:/Users/aorav/Pictures/lora/test/tag",
+            "path": "lora_tagged",
             "repeats": 4
         }
     ],

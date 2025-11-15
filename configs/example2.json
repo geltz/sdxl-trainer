@@ -69,7 +69,7 @@
     "RESUME_TRAINING": false,
     "INSTANCE_DATASETS": [
         {
-            "path": "D:/tagged",
+            "path": "tagged",
             "repeats": 1
         }
     ],
