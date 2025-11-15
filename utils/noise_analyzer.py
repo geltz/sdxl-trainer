@@ -39,6 +39,11 @@ class NoiseAnalyzer:
         self.extract_radius = self.zoom_radius // self.zoom_factor
         self.display_size = self.zoom_radius * 2
         
+        # Zoom configuration
+        self._min_zoom_radius = 50
+        self._max_zoom_radius = 300
+        self._zoom_step = 10
+        
         # Precompute circular mask once
         self._circular_mask = self._create_circular_mask(self.zoom_radius)
         
@@ -68,7 +73,7 @@ class NoiseAnalyzer:
         cmap.set_bad(alpha=0.0)
         
         fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(14, 7))
-        fig.suptitle('Forensic Noise Analysis', fontsize=16)
+        fig.suptitle('Forensic Noise Analysis - Scroll To Zoom', fontsize=16)
         
         return fig, ax1, ax2, cmap
     
@@ -109,6 +114,19 @@ class NoiseAnalyzer:
         """Create a circular boolean mask for zoom overlay."""
         y_grid, x_grid = np.ogrid[-radius:radius, -radius:radius]
         return x_grid**2 + y_grid**2 <= radius**2
+    
+    def _update_zoom_parameters(self):
+        self.extract_radius = self.zoom_radius // self.zoom_factor
+        self.display_size = self.zoom_radius * 2
+
+        self._circular_mask = self._create_circular_mask(self.zoom_radius)
+        self._zoom_grid_y, self._zoom_grid_x = np.mgrid[
+            -self.extract_radius:self.extract_radius:complex(0, self.display_size),
+            -self.extract_radius:self.extract_radius:complex(0, self.display_size)
+        ]
+
+        # Invalidate zoom cache so it’s recreated with the new size
+        self._zoomed_padded_cache = None
     
     def _setup_event_handlers(self, fig, ax1, ax2, components):
         """Set up optimized mouse event handlers for 144fps."""
@@ -179,12 +197,47 @@ class NoiseAnalyzer:
             # Blit only the affected axis
             fig.canvas.blit(ax.bbox)
         
+        def on_scroll(event):
+            """Handle mouse wheel scroll to adjust zoom circle size."""
+            if event.inaxes is None or event.xdata is None or event.ydata is None:
+                return
+            
+            # Determine direction and adjust radius
+            if event.button == 'up':
+                # Scroll up - increase zoom radius
+                new_radius = min(self._max_zoom_radius, self.zoom_radius + self._zoom_step)
+            elif event.button == 'down':
+                # Scroll down - decrease zoom radius
+                new_radius = max(self._min_zoom_radius, self.zoom_radius - self._zoom_step)
+            else:
+                return
+            
+            # Only update if radius actually changed
+            if new_radius != self.zoom_radius:
+                self.zoom_radius = new_radius
+                self._update_zoom_parameters()
+                
+                # Update current zoom elements if active
+                if self._current_axis is not None:
+                    x, y = int(event.xdata), int(event.ydata)
+                    self._update_zoom_elements_optimized(x, y)
+                    
+                    # Redraw with blitting
+                    fig.canvas.restore_region(self.backgrounds[self._current_axis])
+                    outer_circle, inner_circle = self._current_circles
+                    ax = ax1 if self._current_axis == 'ax1' else ax2
+                    ax.draw_artist(outer_circle)
+                    ax.draw_artist(inner_circle)
+                    ax.draw_artist(self._current_zoom_im)
+                    fig.canvas.blit(ax.bbox)
+        
         def on_leave(event):
             """Hide zoom elements when mouse leaves figure."""
             self._hide_all_zoom_elements()
             fig.canvas.draw_idle()
         
         fig.canvas.mpl_connect('motion_notify_event', on_motion)
+        fig.canvas.mpl_connect('scroll_event', on_scroll)
         fig.canvas.mpl_connect('figure_leave_event', on_leave)
     
     def _hide_all_zoom_elements(self):
@@ -210,6 +263,7 @@ class NoiseAnalyzer:
                 if name in self.backgrounds:
                     canvas.restore_region(self.backgrounds[name])
                     canvas.blit(ax.bbox)
+    
     def _update_zoom_elements_optimized(self, x, y):
         """Ultra-fast update of zoom elements."""
         if self._current_circles is None or self._current_zoom_im is None:
@@ -217,9 +271,11 @@ class NoiseAnalyzer:
             
         outer_circle, inner_circle = self._current_circles
         
-        # Update circle positions
+        # Update circle positions and radii
         outer_circle.center = (x, y)
         inner_circle.center = (x, y)
+        outer_circle.set_radius(self.zoom_radius)
+        inner_circle.set_radius(self.zoom_radius)
         outer_circle.set_visible(True)
         inner_circle.set_visible(True)
         
