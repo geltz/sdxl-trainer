@@ -1055,9 +1055,9 @@ def main():
                 ).to(device, dtype=embeds.dtype)
 
             if getattr(config, "USE_NOISE_OFFSET", False):
-                    noise = generate_offset_noise(latents, config)
-                else:
-                    noise = torch.randn_like(latents)
+                            noise = generate_offset_noise(latents, config)
+                        else:
+                            noise = torch.randn_like(latents)
 
                 timesteps = timestep_sampler.sample(latents.shape[0])
                 timestep_sampler.record_timesteps(timesteps)
