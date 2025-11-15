@@ -31,7 +31,7 @@ def prevent_sleep(enable=True):
 STYLESHEET = """
 QWidget {
     background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
-                                stop:0 #dee1e8, stop:0.45 #e0e4ed, stop:1 #e8ecf0);
+                                stop:0 #ccd0da, stop:0.45 #e0e4ed, stop:1 #e8ecf0);
     color: #4a5568;
     font-family: 'Segoe UI', 'SF Pro Display', -apple-system, BlinkMacSystemFont, system-ui, sans-serif;
     font-size: 14px;
@@ -310,7 +310,7 @@ class GraphPanel(QtWidgets.QWidget):
         
         # Display settings - UPDATED COLORS
         self.padding = {'top': 35, 'bottom': 40, 'left': 70, 'right': 20}
-        self.bg_color = QtGui.QColor("#dee1e8")
+        self.bg_color = QtGui.QColor("#ccd0da")
         self.graph_bg_color = QtGui.QColor("#f8fafc")
         self.grid_color = QtGui.QColor("#b0c4d4")
         self.text_color = QtGui.QColor("#4a5568")
@@ -772,7 +772,7 @@ class LRCurveWidget(QtWidgets.QWidget):
         self._dragging_point_index = -1
         self._selected_point_index = -1
         # UPDATED COLORS
-        self.bg_color = QtGui.QColor("#dee1e8")
+        self.bg_color = QtGui.QColor("#ccd0da")
         self.grid_color = QtGui.QColor("#b0c4d4")
         self.epoch_grid_color = QtGui.QColor("#a0aec0")
         self.line_color = QtGui.QColor("#7a8ea4")
