@@ -1597,7 +1597,7 @@ class TrainingGUI(QtWidgets.QWidget):
         top_hbox.setSpacing(20)
         
         groups = {
-            "Batching & DataLoaders": ["CACHING_BATCH_SIZE", "NUM_WORKERS"],
+            "Batching Dataloaders": ["CACHING_BATCH_SIZE", "NUM_WORKERS"],
             "Aspect Ratio Bucketing": ["TARGET_PIXEL_AREA", "SHOULD_UPSCALE", "MAX_AREA_TOLERANCE"],
             "Caption Processing": ["TAG_DROPOUT_RATE", "TAG_DROPOUT_WHITELIST"]
         }
