@@ -641,11 +641,17 @@ class LRCurveWidget(QtWidgets.QWidget):
     def set_epoch_data(self, epoch_data):
         self.epoch_data = epoch_data
         self.update()
-    
+        
     def set_bounds(self, max_steps, min_lr, max_lr):
         self.max_steps = max_steps if max_steps > 0 else 1
+        
+        # Never allow min_lr to be exactly 0
+        if min_lr <= 0:
+            min_lr = max_lr / 10000.0 if max_lr > 0 else 1e-10
+        
         self.min_lr_bound = min_lr
         self.max_lr_bound = max_lr if max_lr > min_lr else min_lr + 1e-9
+        
         self._update_visual_points()
         self.update()
     
@@ -671,7 +677,19 @@ class LRCurveWidget(QtWidgets.QWidget):
         else:
             effective_min_lr = safe_max_lr / self.LOG_FLOOR_DIVISOR
         effective_min_lr = max(effective_min_lr, 1e-12)
+        
+        # CRITICAL FIX: Ensure min < max
+        if effective_min_lr >= safe_max_lr:
+            effective_min_lr = safe_max_lr / 10000.0
+        
         log_min = math.log(effective_min_lr)
+        
+        # Sanity check the range
+        if log_max <= log_min or math.isnan(log_max) or math.isnan(log_min) or math.isinf(log_max) or math.isinf(log_min):
+            # Fallback to sane defaults
+            log_max = math.log(1e-6)
+            log_min = math.log(1e-10)
+        
         return log_max, log_min
     
     def _to_pixel_coords(self, norm_x, abs_lr):
@@ -724,17 +742,21 @@ class LRCurveWidget(QtWidgets.QWidget):
             painter.drawLine(rect.left(), int(y), rect.right(), int(y))
             x = rect.left() + (i / 4.0) * rect.width()
             painter.drawLine(int(x), rect.top(), int(x), rect.bottom())
+        
         epoch_pen = QtGui.QPen(self.epoch_grid_color)
         epoch_pen.setStyle(QtCore.Qt.PenStyle.DotLine)
         painter.setPen(epoch_pen)
         for norm_x, step_count in self.epoch_data:
-            x = rect.left() + norm_x * rect.width()
-            painter.drawLine(int(x), rect.top(), int(x), rect.bottom())
+            if 0.0 <= norm_x <= 1.0:  # Add bounds check
+                x = rect.left() + norm_x * rect.width()
+                painter.drawLine(int(x), rect.top(), int(x), rect.bottom())
+        
         original_font = self.font()
         font = self.font(); font.setPointSize(10); painter.setFont(font)
         painter.setPen(self.text_color)
         log_max, log_min = self._get_log_range()
         log_range = log_max - log_min
+        
         for i in range(5):
             normalized_y = 1.0 - (i / 4.0)
             if i == 0:
@@ -750,18 +772,23 @@ class LRCurveWidget(QtWidgets.QWidget):
             y = rect.top() + (i / 4.0) * rect.height()
             painter.drawText(QtCore.QRect(0, int(y - 10), self.padding['left'] - 5, 20),
                              QtCore.Qt.AlignmentFlag.AlignRight | QtCore.Qt.AlignmentFlag.AlignVCenter, label)
+            
+            # X-axis step labels
             step_val = int(self.max_steps * (i / 4.0))
             label_x = str(step_val)
             x = rect.left() + (i / 4.0) * rect.width()
             painter.drawText(QtCore.QRect(int(x - 50), rect.bottom() + 5, 100, 20),
                              QtCore.Qt.AlignmentFlag.AlignCenter, label_x)
+        
         small_font = self.font()
         small_font.setPointSize(8)
         painter.setFont(small_font)
         for norm_x, step_count in self.epoch_data:
-            x = rect.left() + norm_x * rect.width()
-            label_rect = QtCore.QRect(int(x - 40), rect.bottom() + 25, 80, 15)
-            painter.drawText(label_rect, QtCore.Qt.AlignmentFlag.AlignCenter, str(step_count))
+            if 0.0 <= norm_x <= 1.0:  # Add bounds check here too
+                x = rect.left() + norm_x * rect.width()
+                label_rect = QtCore.QRect(int(x - 40), rect.bottom() + 25, 80, 15)
+                painter.drawText(label_rect, QtCore.Qt.AlignmentFlag.AlignCenter, str(step_count))
+        
         painter.setFont(original_font)
         font.setBold(True); painter.setFont(font)
         painter.drawText(self.rect().adjusted(0, 5, 0, 0), QtCore.Qt.AlignmentFlag.AlignHCenter | QtCore.Qt.AlignmentFlag.AlignTop, "Learning Rate Schedule")
@@ -2156,18 +2183,36 @@ class TrainingGUI(QtWidgets.QWidget):
             return
         try:
             total_images = self.dataset_manager.get_total_repeats()
-            max_steps = int(self.widgets["MAX_TRAIN_STEPS"].text())
-        except (ValueError, KeyError):
+            max_steps = int(self.widgets["MAX_TRAIN_STEPS"].text().strip())
+        except (ValueError, KeyError, AttributeError):
             self.lr_curve_widget.set_epoch_data([])
             return
+        
+        # Clear epoch data if invalid
+        if total_images <= 0 or max_steps <= 0:
+            self.lr_curve_widget.set_epoch_data([])
+            return
+        
         epoch_data = []
-        if total_images > 0 and max_steps > 0:
-            steps_per_epoch = total_images
-            current_epoch_step = steps_per_epoch
-            while current_epoch_step < max_steps:
-                normalized_x = current_epoch_step / max_steps
-                epoch_data.append((normalized_x, int(current_epoch_step)))
-                current_epoch_step += steps_per_epoch
+        steps_per_epoch = total_images
+        
+        # CRITICAL FIX: Only show markers if they're spaced enough apart
+        # Calculate how many epochs would fit
+        num_epochs = max_steps // steps_per_epoch
+        
+        # If more than 10 epochs, skip some to avoid overlap
+        if num_epochs > 10:
+            step_interval = steps_per_epoch * max(1, num_epochs // 10)
+        else:
+            step_interval = steps_per_epoch
+        
+        current_epoch_step = step_interval
+        
+        while current_epoch_step < max_steps:
+            normalized_x = current_epoch_step / max_steps
+            epoch_data.append((normalized_x, int(current_epoch_step)))
+            current_epoch_step += step_interval
+        
         self.lr_curve_widget.set_epoch_data(epoch_data)
     
     def _update_lr_button_states(self, selected_index):
