@@ -1898,7 +1898,7 @@ class TrainingGUI(QtWidgets.QWidget):
             noise_heading.setStyleSheet("color: #7b98d1; margin-top: 5px;")
             layout.addRow(noise_heading)
             
-            noise_info_label = QtWidgets.QLabel("<i>Techniques to improve learning on high-contrast or artistic datasets.</i>")
+            noise_info_label = QtWidgets.QLabel("<i>Only optionally use this on epsilon prediction.</i>")
             noise_info_label.setStyleSheet("color: #7b98d1; font-size: 12px; margin-bottom: 5px;")
             layout.addRow(noise_info_label)
 
