@@ -1179,22 +1179,31 @@ def main():
     )
     
     if use_lora:
+        # Watch first LoRA parameter
+        watch_name = lora_layers[0][0] + ".lora.lora_down.weight"
+        test_param = dict(unet.named_modules())[lora_layers[0][0]].lora.lora_down.weight
+
         # Save LoRA
         lora_state = extract_lora_state_dict(unet)
         final_path = out_dir / f"{base_name}_lora.pt"
         torch.save(lora_state, final_path)
         print(f"Final LoRA saved to: {final_path}")
-        
+
         # Auto-convert to safetensors
         st_path = convert_lora_pt_to_safetensors(final_path)
         if st_path:
             print(f"Final LoRA (safetensors) saved to: {st_path}")
     else:
+        # Watch first non-LoRA trainable parameter
+        watch_name = trainable_names[0]
+        test_param = dict(unet.named_parameters())[watch_name]
+
         # Save full model
         final_path = out_dir / f"{base_name}.safetensors"
         final_sd = base_model_sd.copy()
         unet_sd = unet.state_dict()
         key_map = _generate_hf_to_sd_unet_key_mapping(list(unet_sd.keys()))
+
         for name in trainable_names:
             mapped = key_map.get(name)
             if not mapped:
@@ -1202,6 +1211,7 @@ def main():
             sd_key = "model.diffusion_model." + mapped
             if sd_key in final_sd:
                 final_sd[sd_key] = unet_sd[name].to(config.compute_dtype)
+
         save_file(final_sd, final_path)
         print(f"Final model saved to: {final_path}")
 
