@@ -56,6 +56,16 @@
     "TIMESTEP_SAMPLING_METHOD": "Uniform LogSNR",
     "LOGIT_NORMAL_MEAN": 0.0,
     "LOGIT_NORMAL_STD": 1.0,
+    "USE_LORA": false,
+    "LORA_RANK": 16,
+    "LORA_ALPHA": 16,
+    "LORA_DROPOUT": 0.0,
+    "LORA_TARGET_MODULES": [
+        "to_q",
+        "to_k",
+        "to_v",
+        "to_out.0"
+    ],
     "RESUME_TRAINING": false,
     "INSTANCE_DATASETS": [
         {
