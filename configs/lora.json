@@ -1,8 +1,8 @@
 {
-    "SINGLE_FILE_CHECKPOINT_PATH": "D:/sdxl-trainer/saeri_v1.safetensors",
+    "SINGLE_FILE_CHECKPOINT_PATH": "saeri_v1.safetensors",
     "VAE_PATH": "",
     "USE_REFLECTION_PADDING": false,
-    "OUTPUT_DIR": "D:/sdxl-trainer/output/loras",
+    "OUTPUT_DIR": "loras",
     "RESUME_MODEL_PATH": "",
     "RESUME_STATE_PATH": "",
     "CACHING_BATCH_SIZE": 1,
@@ -103,4 +103,5 @@
         "relative_step": false,
         "warmup_init": false
     }
+
 }
