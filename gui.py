@@ -1180,6 +1180,11 @@ class TrainingGUI(QtWidgets.QWidget):
         corner_hbox.setContentsMargins(10, 5, 10, 5)
         corner_hbox.setSpacing(10)
         self.config_dropdown = QtWidgets.QComboBox()
+        self.config_dropdown.setMinimumWidth(200)  # Prevent text from vanishing
+        self.config_dropdown.setSizePolicy(
+            QtWidgets.QSizePolicy.Policy.Expanding,
+            QtWidgets.QSizePolicy.Policy.Fixed
+        )
         if not self.presets:
             self.log("CRITICAL: No presets loaded to populate dropdown.")
         else:
@@ -1187,7 +1192,7 @@ class TrainingGUI(QtWidgets.QWidget):
                 display = name.replace("_", " ").title()
                 self.config_dropdown.addItem(display, name)
         self.config_dropdown.currentIndexChanged.connect(self.load_selected_config)
-        corner_hbox.addWidget(self.config_dropdown)
+        corner_hbox.addWidget(self.config_dropdown, 1)  # Give it stretch priority
         self.save_button = QtWidgets.QPushButton("Save Config")
         self.save_button.clicked.connect(self.save_config)
         corner_hbox.addWidget(self.save_button)
@@ -1718,11 +1723,23 @@ class TrainingGUI(QtWidgets.QWidget):
         lora_layout = QtWidgets.QVBoxLayout(lora_container)
         lora_layout.setContentsMargins(0, 0, 0, 0)
 
-        # Toggle
+        # Toggle with frozen indicator
         label, widget = self._create_widget("USE_LORA")
         toggle_layout = QtWidgets.QHBoxLayout()
         toggle_layout.addWidget(label)
         toggle_layout.addWidget(widget)
+
+        # Frozen indicator label
+        self.lora_frozen_indicator = QtWidgets.QLabel("(UNet Frozen)")
+        self.lora_frozen_indicator.setStyleSheet("""
+            color: #c74440;
+            font-weight: bold;
+            font-size: 13px;
+            padding-left: 8px;
+        """)
+        self.lora_frozen_indicator.setVisible(False)
+        toggle_layout.addWidget(self.lora_frozen_indicator)
+
         toggle_layout.addStretch()
         lora_layout.addLayout(toggle_layout)
 
@@ -1751,6 +1768,8 @@ class TrainingGUI(QtWidgets.QWidget):
     def _toggle_lora_widgets(self):
         is_lora = self.widgets["USE_LORA"].isChecked()
         self.lora_settings_group.setVisible(is_lora)
+        if hasattr(self, 'lora_frozen_indicator'):
+            self.lora_frozen_indicator.setVisible(is_lora)
 
     def _create_lr_scheduler_group(self):
         lr_group = QtWidgets.QGroupBox("Learning Rate Scheduler")
