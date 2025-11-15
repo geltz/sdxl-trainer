@@ -1764,6 +1764,10 @@ class TrainingGUI(QtWidgets.QWidget):
         
         method = self.widgets["TIMESTEP_SAMPLING_METHOD"].currentText()
         
+        # Auto-enable USE_LOG_SNR for Uniform LogSNR
+        if "Uniform LogSNR" in method and "USE_LOG_SNR" in self.widgets:
+            self.widgets["USE_LOG_SNR"].setChecked(True)
+        
         # Dynamic parameters
         is_dynamic = "Dynamic" in method
         for key in ["TIMESTEP_SAMPLING_GRAD_MIN", "TIMESTEP_SAMPLING_GRAD_MAX"]:
