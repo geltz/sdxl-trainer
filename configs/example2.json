@@ -1,0 +1,103 @@
+{
+    "SINGLE_FILE_CHECKPOINT_PATH": "seelepop3_final.safetensors",
+    "VAE_PATH": "",
+    "USE_REFLECTION_PADDING": false,
+    "OUTPUT_DIR": "output",
+    "RESUME_MODEL_PATH": "",
+    "RESUME_STATE_PATH": "",
+    "CACHING_BATCH_SIZE": 1,
+    "NUM_WORKERS": 0,
+    "SHOULD_UPSCALE": true,
+    "TARGET_PIXEL_AREA": 1048576,
+    "MAX_AREA_TOLERANCE": 1.0,
+    "NOISE_SCHEDULER": "DDPMScheduler",
+    "PREDICTION_TYPE": "v_prediction",
+    "BETA_SCHEDULE": "scaled_linear",
+    "MAX_TRAIN_STEPS": 3000,
+    "LEARNING_RATE": 1.5e-05,
+    "BATCH_SIZE": 1,
+    "GRADIENT_ACCUMULATION_STEPS": 16,
+    "MIXED_PRECISION": "bfloat16",
+    "CLIP_GRAD_NORM": 1.0,
+    "SEED": 333,
+    "FLOW_MATCHING_SIGMA_MIN": 0.002,
+    "FLOW_MATCHING_SIGMA_MAX": 80.0,
+    "FLOW_MATCHING_SHIFT": 1.0,
+    "SAVE_EVERY_N_STEPS": 100,
+    "UNET_EXCLUDE_TARGETS": "conv1, conv2, conv_in, conv_out",
+    "LR_CUSTOM_CURVE": [
+        [
+            0.0,
+            1.5e-05
+        ],
+        [
+            0.75,
+            1.5e-05
+        ],
+        [
+            1.0,
+            3e-07
+        ]
+    ],
+    "LR_GRAPH_MIN": 0.0,
+    "LR_GRAPH_MAX": 2e-05,
+    "MEMORY_EFFICIENT_ATTENTION": "sdpa",
+    "USE_ZERO_TERMINAL_SNR": true,
+    "GRAD_SPIKE_THRESHOLD_HIGH": 20.0,
+    "GRAD_SPIKE_THRESHOLD_LOW": 0.15,
+    "USE_NOISE_OFFSET": false,
+    "NOISE_OFFSET": 0.0,
+    "USE_MULTISCALE_NOISE": false,
+    "TIMESTEP_SAMPLING_MIN": 0,
+    "TIMESTEP_SAMPLING_MAX": 999,
+    "TIMESTEP_SAMPLING_GRAD_MIN": 0.5,
+    "TIMESTEP_SAMPLING_GRAD_MAX": 2.0,
+    "USE_LOG_SNR": true,
+    "TIMESTEP_SAMPLING_METHOD": "Uniform LogSNR",
+    "LOGIT_NORMAL_MEAN": 0.0,
+    "LOGIT_NORMAL_STD": 1.0,
+    "USE_LORA": false,
+    "LORA_RANK": 16,
+    "LORA_ALPHA": 16,
+    "LORA_DROPOUT": 0.0,
+    "LORA_TARGET_MODULES": [
+        "to_q",
+        "to_k",
+        "to_v",
+        "to_out.0"
+    ],
+    "RESUME_TRAINING": false,
+    "INSTANCE_DATASETS": [
+        {
+            "path": "D:/tagged",
+            "repeats": 1
+        }
+    ],
+    "OPTIMIZER_TYPE": "raven",
+    "RAVEN_PARAMS": {
+        "betas": [
+            0.9,
+            0.999
+        ],
+        "eps": 1e-08,
+        "weight_decay": 0.003,
+        "debias_strength": 1.0,
+        "use_grad_centralization": false,
+        "gc_alpha": 0.5,
+        "offload_frequency": 1
+    },
+    "ADAFACTOR_PARAMS": {
+        "eps": [
+            1e-30,
+            0.001
+        ],
+        "clip_threshold": 1.0,
+        "decay_rate": -0.8,
+        "beta1": null,
+        "weight_decay": 0.01,
+        "scale_parameter": true,
+        "relative_step": false,
+        "warmup_init": false
+    }
+
+}
