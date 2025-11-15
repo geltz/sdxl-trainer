@@ -13,10 +13,10 @@
     "NOISE_SCHEDULER": "DDPMScheduler",
     "PREDICTION_TYPE": "v_prediction",
     "BETA_SCHEDULE": "scaled_linear",
-    "MAX_TRAIN_STEPS": 100,
+    "MAX_TRAIN_STEPS": 2000,
     "LEARNING_RATE": 0.0001,
     "BATCH_SIZE": 1,
-    "GRADIENT_ACCUMULATION_STEPS": 4,
+    "GRADIENT_ACCUMULATION_STEPS": 2,
     "MIXED_PRECISION": "bfloat16",
     "CLIP_GRAD_NORM": 1.0,
     "SEED": 333,
@@ -63,7 +63,7 @@
     "USE_LORA": true,
     "LORA_RANK": 16,
     "LORA_ALPHA": 16,
-    "LORA_DROPOUT": 0.0,
+    "LORA_DROPOUT": 0.1,
     "LORA_TARGET_MODULES": [
         "to_q",
         "to_k",
@@ -74,7 +74,7 @@
     "INSTANCE_DATASETS": [
         {
             "path": "C:/Users/aorav/Pictures/lora/test/tag",
-            "repeats": 1
+            "repeats": 4
         }
     ],
     "OPTIMIZER_TYPE": "raven",
