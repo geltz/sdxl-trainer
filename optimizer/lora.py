@@ -1,7 +1,7 @@
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-from typing import List
+from typing import List, Dict, Any
 
 class LoRALinearLayer(nn.Module):
     def __init__(self, in_features: int, out_features: int, rank: int, alpha: float, dropout: float):
@@ -42,7 +42,7 @@ def inject_lora_into_unet(unet, rank: int, alpha: float, dropout: float, target_
             rank,
             alpha,
             dropout
-        ).to(device)  # Move LoRA layer to the same device as UNet
+        ).to(device)
         
         # Store original forward
         original_forward = module.forward
@@ -56,6 +56,10 @@ def inject_lora_into_unet(unet, rank: int, alpha: float, dropout: float, target_
         module.forward = make_forward(original_forward, lora)
         module.lora = lora
         
+        # Store alpha value for saving
+        module.lora_alpha = alpha
+        module.lora_rank = rank
+        
         # Freeze original
         module.weight.requires_grad = False
         if module.bias is not None:
@@ -66,11 +70,39 @@ def inject_lora_into_unet(unet, rank: int, alpha: float, dropout: float, target_
     print(f"Injected LoRA into {len(lora_layers)} layers")
     return lora_layers
 
-def extract_lora_state_dict(unet):
-    """Extract only LoRA weights."""
+def extract_lora_state_dict(unet) -> Dict[str, Any]:
+    """Extract LoRA weights in ComfyUI-compatible format."""
     lora_state = {}
+    
     for name, module in unet.named_modules():
         if hasattr(module, 'lora'):
-            lora_state[f"{name}.lora_down.weight"] = module.lora.lora_down.weight
-            lora_state[f"{name}.lora_up.weight"] = module.lora.lora_up.weight
+            # Convert module name to ComfyUI format
+            # This converts "down_blocks.0.attentions.0.to_q" to formats ComfyUI expects
+            comfy_name = name.replace('.', '_')
+            
+            # Save weights with ComfyUI-compatible keys
+            lora_state[f"{comfy_name}.lora_down.weight"] = module.lora.lora_down.weight
+            lora_state[f"{comfy_name}.lora_up.weight"] = module.lora.lora_up.weight
+            
+            # Also save alpha and rank as metadata (some ComfyUI versions need this)
+            lora_state[f"{comfy_name}.alpha"] = torch.tensor(module.lora_alpha)
+            lora_state[f"{comfy_name}.rank"] = torch.tensor(module.lora_rank)
+    
+    return lora_state
+
+def extract_lora_state_dict_comfy(unet) -> Dict[str, Any]:
+    """Alternative: Extract in more standard ComfyUI format"""
+    lora_state = {}
+    
+    for name, module in unet.named_modules():
+        if hasattr(module, 'lora'):
+            # Format: lora_unet_{module_path}
+            comfy_name = f"lora_unet_{name.replace('.', '_')}"
+            
+            lora_state[f"{comfy_name}.lora_down.weight"] = module.lora.lora_down.weight
+            lora_state[f"{comfy_name}.lora_up.weight"] = module.lora.lora_up.weight
+            
+            # Add alpha parameter that ComfyUI often looks for
+            lora_state[f"{comfy_name}.alpha"] = torch.tensor(module.lora.alpha.item())
+    
     return lora_state
