@@ -1,4 +1,4 @@
-This is a UNet trainer for SDXL models that requires atleast 12 GB of VRAM.    
+This is a UNet trainer for SDXL models that requires atleast 12 GB of VRAM. A bit lower if only using LoRA Mode.    
 
 Modified from [Aozora](https://github.com/Hysocs/Aozora_SDXL_Training) for personal usage.    
 
