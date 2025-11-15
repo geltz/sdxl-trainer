@@ -977,6 +977,8 @@ def main():
         print(f"Total UNet params: {total_params / 1e6:.2f}M")
         print(f"Trainable params: {train_params / 1e6:.2f}M ({train_params/total_params*100:.2f}%)")
 
+    unet.to(device)  # Ensure UNet is on the correct device after LoRA injection
+
     if not params_to_opt:
         raise ValueError("No parameters selected for training.")
 
