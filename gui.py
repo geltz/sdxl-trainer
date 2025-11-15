@@ -884,11 +884,15 @@ class LRCurveWidget(QtWidgets.QWidget):
         self.set_points(points)
         self.pointsChanged.emit(points)
     
+    # ensure curves never start at 0
+    
     def set_cosine_preset(self):
         min_lr, max_lr = self.min_lr_bound, self.max_lr_bound
         warmup_portion = 0.10
         num_decay_points = 10
-        points = [[0.0, min_lr], [warmup_portion, max_lr]]
+        # Start at a small fraction of max_lr instead of min_lr
+        start_lr = max_lr * 0.01 if max_lr * 0.01 > min_lr else min_lr
+        points = [[0.0, start_lr], [warmup_portion, max_lr]]
         decay_duration = 1.0 - warmup_portion
         for i in range(num_decay_points + 1):
             decay_progress = i / num_decay_points
@@ -902,19 +906,22 @@ class LRCurveWidget(QtWidgets.QWidget):
     def set_linear_preset(self):
         min_lr, max_lr = self.min_lr_bound, self.max_lr_bound
         warmup_portion = 0.05
-        points = [[0.0, min_lr], [warmup_portion, max_lr], [1.0, min_lr]]
+        start_lr = max_lr * 0.01 if max_lr * 0.01 > min_lr else min_lr
+        points = [[0.0, start_lr], [warmup_portion, max_lr], [1.0, min_lr]]
         self.apply_preset(points)
     
     def set_constant_preset(self):
         min_lr, max_lr = self.min_lr_bound, self.max_lr_bound
         warmup_portion = 0.05
         cooldown_start = 1.0 - 0.10
-        points = [[0.0, min_lr], [warmup_portion, max_lr], [cooldown_start, max_lr], [1.0, min_lr]]
+        start_lr = max_lr * 0.01 if max_lr * 0.01 > min_lr else min_lr
+        points = [[0.0, start_lr], [warmup_portion, max_lr], [cooldown_start, max_lr], [1.0, min_lr]]
         self.apply_preset(points)
     
     def set_step_preset(self):
         min_lr, max_lr = self.min_lr_bound, self.max_lr_bound
-        points = [[0.0, min_lr], [0.05, max_lr], [0.60, max_lr], [0.65, max_lr / 40], [1.0, min_lr]]
+        start_lr = max_lr * 0.01 if max_lr * 0.01 > min_lr else min_lr
+        points = [[0.0, start_lr], [0.05, max_lr], [0.60, max_lr], [0.65, max_lr / 40], [1.0, min_lr]]
         self.apply_preset(points)
     
     def set_cyclical_dip_preset(self):
@@ -925,7 +932,8 @@ class LRCurveWidget(QtWidgets.QWidget):
         dip_factor = 0.25
         dip_bottom_duration = 0.035
         dip_transition_duration = 0.025
-        points = [[0.0, min_lr], [warmup_end_portion, max_lr]]
+        start_lr = max_lr * 0.01 if max_lr * 0.01 > min_lr else min_lr
+        points = [[0.0, start_lr], [warmup_end_portion, max_lr]]
         plateau_duration = cooldown_start_portion - warmup_end_portion
         single_dip_total_duration = (dip_transition_duration * 2) + dip_bottom_duration
         flat_part_duration = (plateau_duration - (num_dips * single_dip_total_duration)) / (num_dips + 1)
