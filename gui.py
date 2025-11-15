@@ -1268,6 +1268,7 @@ class TrainingGUI(QtWidgets.QWidget):
         "LORA_ALPHA": {"label": "LoRA Alpha:", "tooltip": "Scaling factor (typically = rank)", "widget": "QSpinBox", "range": (1, 128)},
         "LORA_DROPOUT": {"label": "LoRA Dropout:", "tooltip": "Dropout rate (0.0-0.5)", "widget": "QDoubleSpinBox", "range": (0.0, 0.5), "step": 0.1},
         "TAG_DROPOUT_RATE": {"label": "Tag Dropout Rate:", "tooltip": "Probability of dropping each tag (0.0-1.0). Helps model learn individual tag meanings.", "widget": "QDoubleSpinBox", "range": (0.0, 0.5), "step": 0.05},
+        "TAG_DROPOUT_WHITELIST": {"label": "Tag Whitelist:", "tooltip": "Comma-separated tags protected from dropout. Supports wildcards: *girl* matches '1girl', '2girls', etc.", "widget": "QLineEdit"},
     }
     def __init__(self):
         super().__init__()
@@ -1598,7 +1599,7 @@ class TrainingGUI(QtWidgets.QWidget):
         groups = {
             "Batching & DataLoaders": ["CACHING_BATCH_SIZE", "NUM_WORKERS"],
             "Aspect Ratio Bucketing": ["TARGET_PIXEL_AREA", "SHOULD_UPSCALE", "MAX_AREA_TOLERANCE"],
-            "Caption Processing": ["TAG_DROPOUT_RATE"]
+            "Caption Processing": ["TAG_DROPOUT_RATE", "TAG_DROPOUT_WHITELIST"]
         }
         
         for title, keys in groups.items():

@@ -124,3 +124,4 @@ LORA_TARGET_MODULES = ["to_q", "to_k", "to_v", "to_out.0"]
 
 # --- Dataset Configuration ---
 TAG_DROPOUT_RATE = 0.1  # 10% chance to drop each tag
+TAG_DROPOUT_WHITELIST = "*girl*, *boy*, solo, masterpiece"  # Supports wildcards with *

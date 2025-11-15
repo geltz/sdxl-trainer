@@ -87,17 +87,47 @@ def normalize_model_path(pathlike):
 
     return str(p.resolve())
 
-def apply_tag_dropout(caption: str, dropout_rate: float) -> str:
-    """Randomly drop tags from comma-separated caption."""
+def apply_tag_dropout(caption: str, dropout_rate: float, whitelist: list) -> str:
+    """Randomly drop tags from comma-separated caption, preserving whitelisted tags.
+    Whitelist supports wildcards: *girl* matches '1girl', '2girls', etc.
+    """
     if dropout_rate <= 0 or not caption:
         return caption
     
     tags = [t.strip() for t in caption.split(',')]
     if len(tags) <= 1:
-        return caption  # Don't drop if only one tag
+        return caption
     
-    # Keep at least one tag
-    kept_tags = [t for t in tags if random.random() > dropout_rate]
+    def matches_whitelist(tag: str, whitelist: list) -> bool:
+        """Check if tag matches any whitelist pattern (supports * wildcard)."""
+        tag_lower = tag.lower()
+        for pattern in whitelist:
+            pattern_lower = pattern.lower()
+            
+            if '*' in pattern_lower:
+                # Convert wildcard to regex: *girl* -> .*girl.*
+                import re
+                regex_pattern = '^' + pattern_lower.replace('*', '.*') + '$'
+                if re.match(regex_pattern, tag_lower):
+                    return True
+            elif tag_lower == pattern_lower:
+                return True
+        
+        return False
+    
+    kept_tags = []
+    droppable_tags = []
+    
+    for tag in tags:
+        if matches_whitelist(tag, whitelist):
+            kept_tags.append(tag)  # Always keep whitelisted
+        else:
+            droppable_tags.append(tag)
+    
+    # Apply dropout to non-whitelisted tags
+    kept_tags.extend([t for t in droppable_tags if random.random() > dropout_rate])
+    
+    # Ensure at least one tag remains
     if not kept_tags:
         kept_tags = [random.choice(tags)]
     
@@ -434,7 +464,8 @@ def precompute_and_cache_latents(config: TrainingConfig, t1, t2, te1, te2, vae, 
                 caption = ip.stem.replace("_", " ")
 
             # Apply tag dropout during caching
-            caption = apply_tag_dropout(caption, config.TAG_DROPOUT_RATE)
+            whitelist = [w.strip() for w in config.TAG_DROPOUT_WHITELIST.split(',') if w.strip()]
+            caption = apply_tag_dropout(caption, config.TAG_DROPOUT_RATE, whitelist)
 
             embeds, pooled = compute_chunked_text_embeddings([caption], t1, t2, te1, te2, device)
             with torch.no_grad():
