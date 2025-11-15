@@ -852,46 +852,47 @@ def main():
     
     sched_name = getattr(config, "NOISE_SCHEDULER", "DDPMScheduler").replace(" (Experimental)", "")
     
-    # Special handling for flow matching
+    # Check prediction type first
     is_flow_matching = config.PREDICTION_TYPE == "flow_matching"
-    if is_flow_matching and sched_name not in ["FlowMatchEulerDiscreteScheduler"]:
-        # If flow matching is selected but scheduler isn't FlowMatch, force it
+    
+    # Force correct scheduler for flow matching
+    if is_flow_matching and sched_name != "FlowMatchEulerDiscreteScheduler":
         print(f"WARNING: Flow matching requires FlowMatchEulerDiscreteScheduler. Overriding {sched_name}.")
         sched_name = "FlowMatchEulerDiscreteScheduler"
     elif not is_flow_matching and sched_name == "FlowMatchEulerDiscreteScheduler":
-        # If FlowMatch scheduler is selected but prediction type isn't flow_matching, warn
         print(f"WARNING: FlowMatchEulerDiscreteScheduler requires prediction_type='flow_matching'. Switching to DDPMScheduler.")
         sched_name = "DDPMScheduler"
-    
-    # Special handling for flow matching
-    is_flow_matching = config.PREDICTION_TYPE == "flow_matching"
-    if is_flow_matching:
-        sched_name = "FlowMatchEulerDiscreteScheduler"
     
     sched_cls = SCHED_MAP.get(sched_name)
     if not sched_cls:
         raise ValueError(f"Unknown scheduler {sched_name}")
     
-    train_sched_cfg = orig_sched_cfg.copy()
+    # Convert FrozenDict to regular dict
+    train_sched_cfg = dict(orig_sched_cfg)
     
     if is_flow_matching:
         # Flow matching specific config
-        train_sched_cfg["shift"] = getattr(config, "FLOW_MATCHING_SHIFT", 1.0) # default shift
-        train_sched_cfg["sigma_min"] = getattr(config, "FLOW_MATCHING_SIGMA_MIN", 0.002)
-        train_sched_cfg["sigma_max"] = getattr(config, "FLOW_MATCHING_SIGMA_MAX", 80.0)
-        # Remove incompatible keys
+        train_sched_cfg["shift"] = getattr(config, "FLOW_MATCHING_SHIFT", 1.0)
+        train_sched_cfg["num_train_timesteps"] = 1000
+        # Remove incompatible keys for FlowMatch
         train_sched_cfg.pop("prediction_type", None)
         train_sched_cfg.pop("beta_schedule", None)
+        train_sched_cfg.pop("beta_start", None)
+        train_sched_cfg.pop("beta_end", None)
+        train_sched_cfg.pop("trained_betas", None)
+        print(f"INFO: Flow matching enabled with shift={train_sched_cfg['shift']}")
     else:
         train_sched_cfg["prediction_type"] = config.PREDICTION_TYPE
     
+    # Filter to only valid keys for this scheduler
     train_sched_cfg = filter_scheduler_config(train_sched_cfg, sched_cls)
     noise_scheduler = sched_cls.from_config(train_sched_cfg)
     
+    print(f"INFO: Using scheduler {sched_cls.__name__}")
     if is_flow_matching:
-        print(f"INFO: Using Flow Matching with {sched_cls.__name__}, sigma_min={noise_scheduler.config.sigma_min}, sigma_max={noise_scheduler.config.sigma_max}")
+        print(f"      Flow matching mode active")
     else:
-        print(f"INFO: Using scheduler {sched_cls.__name__} with pred type {noise_scheduler.config.prediction_type}")
+        print(f"      Prediction type: {noise_scheduler.config.prediction_type}")
 
     # 4) optional zero-terminal SNR
     if getattr(config, "USE_ZERO_TERMINAL_SNR", False) and hasattr(noise_scheduler, "betas"):
