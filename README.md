@@ -10,7 +10,7 @@ Features:
 - More timestep sampling choices.
 - Flow matching with FlowMatchEulerDiscrete scheduler.
 - RavenAdamW buffers stored in fp32.  
-- Offload state offload frequency.
+- Optimizer state offload frequency.
 - Optional reflection padding for EQ-VAE.    
 - Neutral theme with squared borders.
 - Bonus utility scripts.    
