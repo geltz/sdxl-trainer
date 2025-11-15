@@ -27,10 +27,6 @@ def inject_lora_into_unet(unet, rank: int, alpha: float, dropout: float, target_
     
     for name, module in unet.named_modules():
         if any(target in name for target in target_modules) and isinstance(module, nn.Linear):
-            parent_name = '.'.join(name.split('.')[:-1])
-            child_name = name.split('.')[-1]
-            parent = dict(unet.named_modules())[parent_name] if parent_name else unet
-            
             # Create LoRA layer
             lora = LoRALinearLayer(
                 module.in_features,
@@ -40,16 +36,19 @@ def inject_lora_into_unet(unet, rank: int, alpha: float, dropout: float, target_
                 dropout
             )
             
-            # Wrap original + LoRA
-            original_forward = module.forward
+            # Store original forward and LoRA
+            module._original_forward = module.forward
+            module.lora = lora
             
-            def make_lora_forward(orig_linear, lora_layer):
-                def forward(x):
-                    return orig_linear(x) + lora_layer(x)
+            # Create new forward that uses stored _original_forward
+            def make_lora_forward(lora_layer):
+                def forward(self, x):
+                    return self._original_forward(x) + lora_layer(x)
                 return forward
             
-            module.forward = make_lora_forward(module, lora)
-            module.lora = lora  # Store reference
+            # Bind the method
+            import types
+            module.forward = types.MethodType(make_lora_forward(lora), module)
             
             # Freeze original weights
             module.weight.requires_grad = False
