@@ -4,10 +4,10 @@ Modified from [Aozora](https://github.com/Hysocs/Aozora_SDXL_Training) for perso
 
 Features:    
 
-- Tag caption dropout.    
 - LoRA Mode (minimal toggle that freezes UNet layers).    
 - More timestep sampling choices.
 - Flow matching with FlowMatchEulerDiscrete scheduler.
+- Tag caption dropout.    
 - Optimizer buffers stored in fp32.  
 - Optimizer state offload frequency.
 - Optional reflection padding for EQ-VAE.
