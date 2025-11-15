@@ -1347,7 +1347,7 @@ class TrainingGUI(QtWidgets.QWidget):
         self.tab_view.addTab(model_scroll, "Parameters")
         
         self.live_metrics_widget = LiveMetricsWidget()
-        self.tab_view.addTab(self.live_metrics_widget, "Metrics")
+        self.tab_view.addTab(self.live_metrics_widget, "Statistics")
         
         console_tab_widget = QtWidgets.QWidget()
         console_layout = QtWidgets.QVBoxLayout(console_tab_widget)
