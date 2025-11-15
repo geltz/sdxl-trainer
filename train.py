@@ -846,12 +846,12 @@ def main():
     base_model_sd = load_file(model_path)
 
     # 3) scheduler for training
-        SCHED_MAP = {
-            "DDPMScheduler": DDPMScheduler,
-            "DDIMScheduler": DDIMScheduler,
-            "EulerDiscreteScheduler": EulerDiscreteScheduler,
-            "FlowMatchEulerDiscreteScheduler": FlowMatchEulerDiscreteScheduler,
-        }
+    SCHED_MAP = {
+        "DDPMScheduler": DDPMScheduler,
+        "DDIMScheduler": DDIMScheduler,
+        "EulerDiscreteScheduler": EulerDiscreteScheduler,
+        "FlowMatchEulerDiscreteScheduler": FlowMatchEulerDiscreteScheduler,
+    }
     
     sched_name = getattr(config, "NOISE_SCHEDULER", "DDPMScheduler").replace(" (Experimental)", "")
     
@@ -1128,7 +1128,7 @@ def main():
 
                 diagnostics.report(current_optim_step, optimizer, raw_norm, clipped, before, after)
 
-                # Inside accumulation loop (around line 720)
+                # Check optimizer step count, not global_step
                 if current_optim_step % config.SAVE_EVERY_N_STEPS == 0:
                     ckpt_name = f"{Path(config.SINGLE_FILE_CHECKPOINT_PATH).stem}_step{current_optim_step}"
                     
@@ -1140,7 +1140,8 @@ def main():
                     if use_lora:
                         # Save LoRA weights
                         lora_state = extract_lora_state_dict(unet)
-                        torch.save(lora_state, ckpt_dir / f"{ckpt_name}_lora.pt")
+                        pt_path = ckpt_dir / f"{ckpt_name}_lora.pt"
+                        torch.save(lora_state, pt_path)
                         print(f"\nSaved LoRA checkpoint at step {current_optim_step}")
                         
                         # Auto-convert to safetensors
@@ -1168,15 +1169,15 @@ def main():
     pbar.close()
     print("\nTraining complete.")
 
+    # 12) final save
     final_optim_step = global_step // config.GRADIENT_ACCUMULATION_STEPS
     base_name = f"{Path(config.SINGLE_FILE_CHECKPOINT_PATH).stem}_final"
     print("Saving final model and state...")
-
     torch.save(
         {"step": final_optim_step, "optimizer_state_dict": optimizer.state_dict()},
         out_dir / f"{base_name}_state.pt",
     )
-
+    
     if use_lora:
         # Save LoRA
         lora_state = extract_lora_state_dict(unet)
@@ -1185,7 +1186,7 @@ def main():
         print(f"Final LoRA saved to: {final_path}")
         
         # Auto-convert to safetensors
-        st_path = convert_lora_pt_to_safetensors(pt_path)
+        st_path = convert_lora_pt_to_safetensors(final_path)
         if st_path:
             print(f"Final LoRA (safetensors) saved to: {st_path}")
     else:
