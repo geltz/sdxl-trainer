@@ -8,7 +8,7 @@ Features:
 
 - LoRA Mode (minimal, freezes UNet layers).    
 - More timestep sampling choices.
-- FlowMatchEulerDiscrete scheduler.
+- Flow matching with FlowMatchEulerDiscrete scheduler.
 - RavenAdamW buffers stored in fp32.  
 - Offload state offload frequency.
 - Optional reflection padding for EQ-VAE.    
