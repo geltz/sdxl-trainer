@@ -599,43 +599,57 @@ class TimestepSampler:
         self.device = device
         self.num_train_timesteps = int(self.scheduler.config.num_train_timesteps)
         self.method = getattr(config, "TIMESTEP_SAMPLING_METHOD", "Random Integer")
-        
-        self.use_log_snr = getattr(config, "USE_LOG_SNR", False)
+
+        # Only enable LogSNR logic if the sampling method actually uses it
+        self.use_log_snr = getattr(config, "USE_LOG_SNR", False) and ("LogSNR" in self.method)
         self.log_snr_per_t = None
-        
-        # DEBUG: Print LogSNR initialization
-        print(f"\n{'='*60}")
-        print(f"TIMESTEP SAMPLER INITIALIZATION")
-        print(f"{'='*60}")
+
+        print(f"\n{'=' * 60}")
+        print("TIMESTEP SAMPLER INITIALIZATION")
+        print(f"{'=' * 60}")
         print(f"Method: {self.method}")
         print(f"USE_LOG_SNR flag: {self.use_log_snr}")
-        
-        if self.use_log_snr and hasattr(self.scheduler, "alphas_cumprod"):
-            alphas_cumprod = self.scheduler.alphas_cumprod
-            if not torch.is_tensor(alphas_cumprod):
-                alphas_cumprod = torch.tensor(alphas_cumprod, device=device, dtype=torch.float32)
+
+        if self.use_log_snr:
+            if hasattr(self.scheduler, "alphas_cumprod"):
+                alphas_cumprod = self.scheduler.alphas_cumprod
+                if not torch.is_tensor(alphas_cumprod):
+                    alphas_cumprod = torch.tensor(
+                        alphas_cumprod, device=device, dtype=torch.float32
+                    )
+                else:
+                    alphas_cumprod = alphas_cumprod.to(
+                        device=device, dtype=torch.float32
+                    )
+
+                # clamp to avoid log(0)
+                alphas_cumprod = alphas_cumprod.clamp(1e-7, 1.0 - 1e-7)
+
+                # log SNR = log(α² / (1-α²))
+                self.log_snr_per_t = torch.log(
+                    alphas_cumprod / (1.0 - alphas_cumprod)
+                )
+                self.log_snr_min = self.log_snr_per_t.min().item()
+                self.log_snr_max = self.log_snr_per_t.max().item()
+
+                print("[OK] LogSNR initialized successfully")
+                print(f"  - SNR range: [{self.log_snr_min:.4f}, {self.log_snr_max:.4f}]")
+                print(f"  - Timesteps: {len(self.log_snr_per_t)}")
             else:
-                alphas_cumprod = alphas_cumprod.to(device=device, dtype=torch.float32)
-            alphas_cumprod = alphas_cumprod.clamp(1e-7, 1.0 - 1e-7)
-            self.log_snr_per_t = torch.log(alphas_cumprod / (1.0 - alphas_cumprod))
-            self.log_snr_min = self.log_snr_per_t.min().item()
-            self.log_snr_max = self.log_snr_per_t.max().item()
-            
-            # DEBUG: Confirm LogSNR setup
-            print(f"[OK] LogSNR initialized successfully")
-            print(f"  - SNR range: [{self.log_snr_min:.4f}, {self.log_snr_max:.4f}]")
-            print(f"  - Timesteps: {len(self.log_snr_per_t)}")
+                # For schedulers like FlowMatchEulerDiscreteScheduler
+                print(
+                    "[WARN] LogSNR sampling requested but scheduler has no "
+                    "alphas_cumprod. Falling back to timestep space."
+                )
         else:
-            print(f"[FAIL] LogSNR NOT initialized")
-            if self.use_log_snr:
-                print(f"  - Reason: scheduler missing alphas_cumprod")
-        
-        print(f"{'='*60}\n")
-        
-        # logit normal parameters
+            print("[INFO] LogSNR-based sampling disabled for this method")
+
+        print(f"{'=' * 60}\n")
+
+        # Logit-normal parameters (timestep-space)
         self.logit_normal_mean = float(getattr(config, "LOGIT_NORMAL_MEAN", 0.0))
         self.logit_normal_std = float(getattr(config, "LOGIT_NORMAL_STD", 1.0))
-        
+
         # dynamic bounds
         self.current_min_ts = float(getattr(config, "TIMESTEP_SAMPLING_MIN", 0))
         self.current_max_ts = float(
@@ -643,74 +657,96 @@ class TimestepSampler:
         )
         self.global_min_ts = 0.0
         self.global_max_ts = float(self.num_train_timesteps - 1)
-        self.target_min_grad = float(getattr(config, "TIMESTEP_SAMPLING_GRAD_MIN", 0.5))
-        self.target_max_grad = float(getattr(config, "TIMESTEP_SAMPLING_GRAD_MAX", 2.0))
+        self.target_min_grad = float(
+            getattr(config, "TIMESTEP_SAMPLING_GRAD_MIN", 0.5)
+        )
+        self.target_max_grad = float(
+            getattr(config, "TIMESTEP_SAMPLING_GRAD_MAX", 2.0)
+        )
         self.adjustment_strength = 0.05
         self.smoothing_factor = 0.9
         self.max_shift_per_step = 50.0
-        self.smoothed_grad_norm = (self.target_min_grad + self.target_max_grad) / 2.0
+        self.smoothed_grad_norm = (
+            self.target_min_grad + self.target_max_grad
+        ) / 2.0
         self.last_timestep_avg = self.num_train_timesteps / 2.0
         self.consecutive_spike_count = 0
 
     def sample(self, batch_size: int):
-        # LogSNR must be checked first
-        if self.use_log_snr and self.method == "Uniform LogSNR" and self.log_snr_per_t is not None:
-            # DEBUG: Confirm we're using LogSNR path (only print once every 100 calls)
-            if not hasattr(self, '_logsnr_sample_count'):
+        # 1) LogSNR-based sampling (e.g. "Uniform LogSNR")
+        if (
+            self.use_log_snr
+            and self.log_snr_per_t is not None
+            and "LogSNR" in self.method
+        ):
+            if not hasattr(self, "_logsnr_sample_count"):
                 self._logsnr_sample_count = 0
-                print(f"\n>>> Using Uniform LogSNR sampling <<<\n")
-            
+                print("\n>>> Using Uniform LogSNR sampling <<<\n")
+
             self._logsnr_sample_count += 1
             if self._logsnr_sample_count % 100 == 0:
                 print(f"[LogSNR] Sampled {self._logsnr_sample_count} batches")
-            
+
             u = torch.rand(batch_size, device=self.device)
             log_snr = self.log_snr_min + u * (self.log_snr_max - self.log_snr_min)
+
             diffs = (self.log_snr_per_t.view(1, -1) - log_snr.view(-1, 1)).abs()
             idx = diffs.argmin(dim=1).long()
             return idx
-            
-        # logit normal
+
+        # 2) Logit-normal over discrete timesteps (FlowMatch + Logit Normal)
         if "Logit Normal" in self.method:
-            if not hasattr(self, '_logit_msg_shown'):
+            if not hasattr(self, "_logit_msg_shown"):
                 self._logit_msg_shown = True
-                print(f"\n>>> Using Logit Normal sampling (μ={self.logit_normal_mean}, σ={self.logit_normal_std}) <<<\n")
-            
-            # Sample from normal distribution
-            z = torch.randn(batch_size, device=self.device) * self.logit_normal_std + self.logit_normal_mean
-            # Apply sigmoid to map to [0, 1]
+                # ASCII-only to avoid Windows cp1252 issues
+                print(
+                    f"\n>>> Using Logit Normal sampling "
+                    f"(mu={self.logit_normal_mean}, sigma={self.logit_normal_std}) <<<\n"
+                )
+
+            # z ~ N(mu, sigma)
+            z = (
+                torch.randn(batch_size, device=self.device) * self.logit_normal_std
+                + self.logit_normal_mean
+            )
+            # map to (0,1) via sigmoid
             u = torch.sigmoid(z)
-            # Scale to timestep range [0, num_train_timesteps-1]
+            # scale to timestep range [0, num_train_timesteps-1]
             t = (u * (self.num_train_timesteps - 1)).long()
-            # Clamp to valid range
             t = torch.clamp(t, 0, self.num_train_timesteps - 1)
             return t
-        
-        # uniform float
+
+        # 3) Uniform continuous in timestep space
         if "Uniform Continuous" in self.method:
-            if not hasattr(self, '_uniform_msg_shown'):
+            if not hasattr(self, "_uniform_msg_shown"):
                 self._uniform_msg_shown = True
-                print(f"\n>>> Using Uniform Continuous sampling <<<\n")
+                print("\n>>> Using Uniform Continuous sampling <<<\n")
             t = torch.rand(batch_size, device=self.device)
             return (t * (self.num_train_timesteps - 1)).long()
-        
-        # dynamic window
+
+        # 4) Dynamic windowed sampling
         if "Dynamic" in self.method:
-            if not hasattr(self, '_dynamic_msg_shown'):
+            if not hasattr(self, "_dynamic_msg_shown"):
                 self._dynamic_msg_shown = True
-                print(f"\n>>> Using Dynamic windowed sampling <<<\n")
+                print("\n>>> Using Dynamic windowed sampling <<<\n")
             mn = int(self.current_min_ts)
             mx = int(self.current_max_ts)
             if mn >= mx:
                 mn = max(0, mx - 1)
             return torch.randint(mn, mx + 1, (batch_size,), device=self.device)
-        
-        # fallback: random integer / fixed window
-        if not hasattr(self, '_fallback_msg_shown'):
+
+        # 5) Fallback: plain random integer timesteps
+        if not hasattr(self, "_fallback_msg_shown"):
             self._fallback_msg_shown = True
-            print(f"\n>>> Using Random Integer sampling (fallback) <<<\n")
+            print("\n>>> Using Random Integer sampling (fallback) <<<\n")
         mn = int(getattr(self.config, "TIMESTEP_SAMPLING_MIN", 0))
-        mx = int(getattr(self.config, "TIMESTEP_SAMPLING_MAX", self.num_train_timesteps - 1))
+        mx = int(
+            getattr(
+                self.config,
+                "TIMESTEP_SAMPLING_MAX",
+                self.num_train_timesteps - 1,
+            )
+        )
         return torch.randint(mn, mx + 1, (batch_size,), device=self.device)
 
     def update(self, raw_grad_norm: float):
