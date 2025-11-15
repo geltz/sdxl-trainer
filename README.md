@@ -16,6 +16,7 @@ Features:
 
 Usage:
 
+`git clone https://github.com/geltz/sdxl-trainer`  
 `python -m venv venv`        
 `./venv/scripts/activate`    
 `pip install -r requirements.txt`      
