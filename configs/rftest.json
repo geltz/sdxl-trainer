@@ -13,7 +13,7 @@
     "NOISE_SCHEDULER": "FlowMatchEulerDiscreteScheduler",
     "PREDICTION_TYPE": "flow_matching",
     "BETA_SCHEDULE": "scaled_linear",
-    "MAX_TRAIN_STEPS": 6000,
+    "MAX_TRAIN_STEPS": 9000,
     "LEARNING_RATE": 3e-05,
     "BATCH_SIZE": 1,
     "GRADIENT_ACCUMULATION_STEPS": 16,
@@ -105,4 +105,5 @@
     }
 
 }
+
 
