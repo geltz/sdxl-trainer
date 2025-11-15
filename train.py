@@ -97,32 +97,52 @@ def get_training_model_path(config):
         raw = getattr(config, "SINGLE_FILE_CHECKPOINT_PATH", "./model.safetensors")
     return normalize_model_path(raw)
 
-def apply_reflection_padding_to_unet(unet, enabled=False):
+def apply_reflection_padding_to_unet(unet, enabled: bool = False):
     if not enabled:
         return
-    
+
     import torch.nn as nn
-    
-    # Collect first, modify after
+
+    # Build a flat dict so we can look up parents by name once
+    module_dict = dict(unet.named_modules())
+
     to_modify = []
-    for name, module in unet.named_modules():
-        if isinstance(module, nn.Conv2d) and module.padding != (0, 0):
-            orig_pad = module.padding if isinstance(module.padding, tuple) else (module.padding, module.padding)
-            if orig_pad[0] > 0 or orig_pad[1] > 0:
-                to_modify.append((name, module, orig_pad))
-    
-    # Now modify
-    for name, module, orig_pad in to_modify:
-        module.padding = (0, 0)
-        parent_name = '.'.join(name.split('.')[:-1])
-        parent = dict(unet.named_modules())[parent_name] if parent_name else unet
-        conv_name = name.split('.')[-1]
-        
-        setattr(parent, conv_name, nn.Sequential(
-            nn.ReflectionPad2d(orig_pad),
-            module
-        ))
-    
+
+    # First: collect all Conv2d layers that actually use padding
+    for name, module in module_dict.items():
+        if not isinstance(module, nn.Conv2d):
+            continue
+
+        # Conv2d.padding can be int or (h, w)
+        if isinstance(module.padding, tuple):
+            pad_h, pad_w = module.padding
+        else:
+            pad_h = pad_w = int(module.padding)
+
+        if pad_h == 0 and pad_w == 0:
+            continue  # nothing to do
+
+        to_modify.append((name, module, pad_h, pad_w))
+
+    # Second: wrap them with ReflectionPad2d
+    for name, conv, pad_h, pad_w in to_modify:
+        # Remove internal conv padding – we'll do it explicitly via ReflectionPad2d
+        conv.padding = (0, 0)
+
+        # Find parent module and attribute name
+        parent_name, _, child_name = name.rpartition(".")
+        parent = unet if parent_name == "" else module_dict[parent_name]
+
+        # ReflectionPad2d expects (left, right, top, bottom)
+        reflect_padding = (pad_w, pad_w, pad_h, pad_h)
+
+        wrapped = nn.Sequential(
+            nn.ReflectionPad2d(reflect_padding),
+            conv,
+        )
+
+        setattr(parent, child_name, wrapped)
+
     if to_modify:
         print(f"INFO: Applied reflection padding to {len(to_modify)} Conv2d layers")
 
