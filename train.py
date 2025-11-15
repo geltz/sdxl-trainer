@@ -1014,8 +1014,14 @@ def main():
     is_v_pred = config.PREDICTION_TYPE == "v_prediction"
     is_flow_matching = config.PREDICTION_TYPE == "flow_matching"
 
-    watch_name = trainable_names[0]
-    test_param = dict(unet.named_parameters())[watch_name]
+    if use_lora:
+        # For LoRA, watch the first LoRA parameter
+        watch_name = lora_layers[0][0] + ".lora.lora_down.weight"
+        test_param = dict(unet.named_parameters())[watch_name]
+    else:
+        watch_name = trainable_names[0]
+        test_param = dict(unet.named_parameters())[watch_name]
+    
     diagnostics = TrainingDiagnostics(config.GRADIENT_ACCUMULATION_STEPS, watch_name)
 
     print("=" * 40)
@@ -1181,7 +1187,7 @@ def main():
     if use_lora:
         # Watch first LoRA parameter
         watch_name = lora_layers[0][0] + ".lora.lora_down.weight"
-        test_param = dict(unet.named_modules())[lora_layers[0][0]].lora.lora_down.weight
+        test_param = dict(unet.named_parameters())[watch_name]
 
         # Save LoRA
         lora_state = extract_lora_state_dict(unet)
@@ -1194,7 +1200,6 @@ def main():
         if st_path:
             print(f"Final LoRA (safetensors) saved to: {st_path}")
     else:
-        # Watch first non-LoRA trainable parameter
         watch_name = trainable_names[0]
         test_param = dict(unet.named_parameters())[watch_name]
 
