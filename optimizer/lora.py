@@ -3,33 +3,35 @@ import torch.nn as nn
 import torch.nn.functional as F
 from typing import List
 
-class LoRAWrapper(nn.Module):
-    def __init__(self, linear: nn.Linear, lora: LoRALinearLayer):
+class LoRALinearLayer(nn.Module):
+    def __init__(self, in_features: int, out_features: int, rank: int, alpha: float, dropout: float):
         super().__init__()
-        self.linear = linear
-        self.lora = lora
+        self.rank = rank
+        self.alpha = alpha
+        self.scaling = alpha / rank
         
-    def forward(self, x):
-        return self.linear(x) + self.lora(x)
+        self.lora_down = nn.Linear(in_features, rank, bias=False)
+        self.lora_up = nn.Linear(rank, out_features, bias=False)
+        self.dropout = nn.Dropout(dropout) if dropout > 0 else nn.Identity()
+        
+        # Initialize
+        nn.init.kaiming_uniform_(self.lora_down.weight, a=5**0.5)
+        nn.init.zeros_(self.lora_up.weight)
+    
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
+        return self.lora_up(self.dropout(self.lora_down(x))) * self.scaling
 
 def inject_lora_into_unet(unet, rank: int, alpha: float, dropout: float, target_modules: List[str]):
     """Inject LoRA layers into UNet."""
     lora_layers = []
     
-    def replace_module(model, name, new_module):
-        parts = name.split('.')
-        parent = model
-        for part in parts[:-1]:
-            parent = getattr(parent, part)
-        setattr(parent, parts[-1], new_module)
-    
-    # Collect targets WITHOUT iterating named_modules
+    # Collect target modules first
     targets = []
-    for name, module in list(unet.named_modules()):
+    for name, module in unet.named_modules():
         if any(target in name for target in target_modules) and isinstance(module, nn.Linear):
             targets.append((name, module))
     
-    # Replace modules
+    # Now modify them
     for name, module in targets:
         lora = LoRALinearLayer(
             module.in_features,
@@ -39,14 +41,22 @@ def inject_lora_into_unet(unet, rank: int, alpha: float, dropout: float, target_
             dropout
         )
         
+        # Store original forward
+        original_forward = module.forward
+        
+        # Create wrapper
+        def make_forward(orig, lora_layer):
+            def forward(x):
+                return orig(x) + lora_layer(x)
+            return forward
+        
+        module.forward = make_forward(original_forward, lora)
+        module.lora = lora
+        
         # Freeze original
         module.weight.requires_grad = False
         if module.bias is not None:
             module.bias.requires_grad = False
-        
-        # Replace with wrapper
-        wrapper = LoRAWrapper(module, lora)
-        replace_module(unet, name, wrapper)
         
         lora_layers.append((name, lora))
     
