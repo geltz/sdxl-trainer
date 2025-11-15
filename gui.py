@@ -1086,7 +1086,7 @@ class TrainingGUI(QtWidgets.QWidget):
         "USE_LORA": {"label": "LoRA Mode", "tooltip": "Train a LoRA instead of full model", "widget": "QCheckBox"},
         "LORA_RANK": {"label": "LoRA Rank:", "tooltip": "Rank of LoRA matrices (4-128)", "widget": "QSpinBox", "range": (1, 128)},
         "LORA_ALPHA": {"label": "LoRA Alpha:", "tooltip": "Scaling factor (typically = rank)", "widget": "QSpinBox", "range": (1, 128)},
-        "LORA_DROPOUT": {"label": "LoRA Dropout:", "tooltip": "Dropout rate (0.0-0.5)", "widget": "QLineEdit"},
+        "LORA_DROPOUT": {"label": "LoRA Dropout:", "tooltip": "Dropout rate (0.0-0.5)", "widget": "QDoubleSpinBox", "range": (0.0, 0.5), "step": 0.1},
     }
     def __init__(self):
         super().__init__()
@@ -1366,6 +1366,14 @@ class TrainingGUI(QtWidgets.QWidget):
             widget = QtWidgets.QSpinBox()
             if "range" in definition:
                 widget.setRange(*definition["range"])
+            widget.valueChanged.connect(lambda value, k=key: self._update_config_from_widget(k, widget))
+        elif widget_type == "QDoubleSpinBox":
+            widget = QtWidgets.QDoubleSpinBox()
+            if "range" in definition:
+                widget.setRange(*definition["range"])
+            if "step" in definition:
+                widget.setSingleStep(definition["step"])
+            widget.setDecimals(2)  # Show 2 decimal places
             widget.valueChanged.connect(lambda value, k=key: self._update_config_from_widget(k, widget))
         elif widget_type == "QComboBox":
             widget = QtWidgets.QComboBox()
