@@ -43,7 +43,7 @@ TrainingGUI {
     color: #4a6b99;
     font-size: 28px;
     font-weight: bold;
-    padding: 15px;
+    padding: 8px;
     border-bottom: 2px solid #8fa8c7;
 }
 QGroupBox {
@@ -1119,8 +1119,8 @@ class TrainingGUI(QtWidgets.QWidget):
         super().__init__()
         self.setObjectName("TrainingGUI")
         self.setWindowTitle("SDXL Trainer")
-        self.setMinimumSize(QtCore.QSize(1000, 800))
-        self.resize(1350, 1000)
+        self.setMinimumSize(QtCore.QSize(900, 700))
+        self.resize(1200, 850)
         self.config_dir = "configs"
         self.widgets = {}
         self.process_runner = None
