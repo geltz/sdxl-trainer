@@ -954,9 +954,7 @@ def main():
 
         print(f"Total UNet params: {total_params / 1e6:.2f}M")
         print(f"Trainable LoRA params: {train_params / 1e6:.2f}M ({train_params/total_params*100:.4f}%)")
-        
-        trainable_names = [name for name, _ in lora_layers]
-        frozen_names = []
+
     else:
         # Original full-model training
         trainable_names, frozen_names = [], []
