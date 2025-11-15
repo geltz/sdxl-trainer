@@ -1344,15 +1344,15 @@ class TrainingGUI(QtWidgets.QWidget):
         model_scroll = QtWidgets.QScrollArea()
         model_scroll.setWidgetResizable(True)
         model_scroll.setWidget(model_content_widget)
-        self.tab_view.addTab(model_scroll, "Model && Training Parameters")
+        self.tab_view.addTab(model_scroll, "Parameters")
         
         self.live_metrics_widget = LiveMetricsWidget()
-        self.tab_view.addTab(self.live_metrics_widget, "Live Metrics")
+        self.tab_view.addTab(self.live_metrics_widget, "Metrics")
         
         console_tab_widget = QtWidgets.QWidget()
         console_layout = QtWidgets.QVBoxLayout(console_tab_widget)
         self._populate_console_tab(console_layout)
-        self.tab_view.addTab(console_tab_widget, "Training Console")
+        self.tab_view.addTab(console_tab_widget, "Console")
         self.main_layout.addWidget(self.tab_view)
         self._setup_corner_widget()
         self._setup_action_buttons()
