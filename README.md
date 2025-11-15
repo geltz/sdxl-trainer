@@ -11,7 +11,8 @@ Features:
 - RavenAdamW buffers stored in fp32.  
 - Offload frequency value.
 - Optional reflection padding for EQ-VAE.    
-- Neutral theme with squared borders.  
+- Neutral theme with squared borders.
+- Bonus utility scripts.    
 
 Usage:
 
