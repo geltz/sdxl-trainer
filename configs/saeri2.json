@@ -1,8 +1,8 @@
 {
-    "SINGLE_FILE_CHECKPOINT_PATH": "D:/sdxl-trainer/output/seelepop3_final.safetensors",
+    "SINGLE_FILE_CHECKPOINT_PATH": "seelepop3_final.safetensors",
     "VAE_PATH": "",
     "USE_REFLECTION_PADDING": false,
-    "OUTPUT_DIR": "D:/sdxl-trainer/output",
+    "OUTPUT_DIR": "output",
     "RESUME_MODEL_PATH": "",
     "RESUME_STATE_PATH": "",
     "CACHING_BATCH_SIZE": 1,
@@ -99,4 +99,5 @@
         "relative_step": false,
         "warmup_init": false
     }
+
 }
