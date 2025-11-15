@@ -256,7 +256,6 @@ def inject_lora_peft(
         lora_dropout=float(getattr(config, "LORA_DROPOUT", 0.0)),
         target_modules=target_modules,
         bias="none",
-        task_type="UNET",  # PEFT has a dedicated task type for UNet2D models
         init_lora_weights=init_lora_weights,
     )
 
