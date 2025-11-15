@@ -7,7 +7,7 @@ Modified from [Aozora](https://github.com/Hysocs/Aozora_SDXL_Training) for perso
 Features:    
 
 - LoRA Mode (minimal, freezes UNet layers).
-  **Work in progress; atm keys are not being recognized, but loras train**
+  **Work in progress; keys are not recognized**
 - More timestep sampling choices.
 - Flow matching with FlowMatchEulerDiscrete scheduler.
 - RavenAdamW buffers stored in fp32.  
