@@ -7,7 +7,7 @@ Features:
 - LoRA Mode (minimal toggle that freezes UNet layers).    
 - More timestep sampling choices.
 - Flow matching with FlowMatchEulerDiscrete scheduler.
-- RavenAdamW buffers stored in fp32.  
+- Optimizer buffers stored in fp32.  
 - Optimizer state offload frequency.
 - Optional reflection padding for EQ-VAE.
 - Improved GUI with neutral blue theme.    
