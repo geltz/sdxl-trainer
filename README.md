@@ -6,6 +6,7 @@ Modified from [Aozora](https://github.com/Hysocs/Aozora_SDXL_Training) for perso
 
 Features:    
 
+- LoRA Mode (outputs a LoRA instead of a checkpoint).    
 - Uniform LogSNR and Logit Normal timestep sampling.
 - FlowMatchEulerDiscrete scheduler.
 - RavenAdamW buffers stored in fp32.  
