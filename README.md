@@ -1,6 +1,4 @@
-This can train SDXL checkpoints with 12 GB of VRAM as a strict minimum.
-  
-Note: This is UNet-only, the text encoders are left as-is.    
+This is a UNet trainer for SDXL models that requires atleast 12 GB of VRAM.    
 
 Modified from [Aozora](https://github.com/Hysocs/Aozora_SDXL_Training) for personal usage.    
 
