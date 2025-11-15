@@ -2772,7 +2772,7 @@ class DatasetManagerWidget(QtWidgets.QWidget):
             
             preview_label = QtWidgets.QLabel()
             preview_label.setFixedSize(183, 183)
-            preview_label.setStyleSheet("border: 1px solid #8fa8c7; background-color: #f8fafc;")
+            preview_label.setStyleSheet("border: 1px solid #8fa8c7; background-color: #e8ecf0;")
             preview_label.setAlignment(QtCore.Qt.AlignmentFlag.AlignCenter)
             preview_label.setScaledContents(False)
             
@@ -2829,7 +2829,7 @@ class DatasetManagerWidget(QtWidgets.QWidget):
             caption_container = QtWidgets.QWidget()
             caption_container.setStyleSheet("""
                 QWidget {
-                    background-color: #f8fafc;
+                    background-color: #e8ecf0;
                     border: 1px solid #8fa8c7;
                     border-radius: 0px;
                 }
