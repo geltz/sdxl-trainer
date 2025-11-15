@@ -6,7 +6,7 @@ Modified from [Aozora](https://github.com/Hysocs/Aozora_SDXL_Training) for perso
 
 Features:    
 
-- LoRA Mode (outputs a LoRA instead of a checkpoint).    
+- LoRA Mode (minimal, freezes UNet layers).    
 - More timestep sampling choices.
 - FlowMatchEulerDiscrete scheduler.
 - RavenAdamW buffers stored in fp32.  
