@@ -37,6 +37,27 @@ import numpy as np
 import config as default_config
 
 from optimizer.lora import inject_lora_into_unet, extract_lora_state_dict
+from safetensors.torch import save_file as save_safetensors
+
+def convert_lora_pt_to_safetensors(pt_path):
+    """Convert LoRA .pt to .safetensors immediately after saving."""
+    try:
+        pt_path = Path(pt_path)
+        output_path = pt_path.with_suffix('.safetensors')
+        
+        # Load and convert
+        lora_state = torch.load(pt_path, map_location="cpu")
+        save_safetensors(lora_state, output_path)
+        
+        # Report sizes
+        pt_size = pt_path.stat().st_size / (1024 * 1024)
+        st_size = output_path.stat().st_size / (1024 * 1024)
+        print(f"  Converted to safetensors: {output_path.name} ({st_size:.2f} MB)")
+        
+        return output_path
+    except Exception as e:
+        print(f"  Warning: Could not convert to safetensors: {e}")
+        return None
 
 # ----- model path helpers (must be defined before main) -----
 def normalize_model_path(pathlike):
@@ -1121,6 +1142,9 @@ def main():
                         lora_state = extract_lora_state_dict(unet)
                         torch.save(lora_state, ckpt_dir / f"{ckpt_name}_lora.pt")
                         print(f"\nSaved LoRA checkpoint at step {current_optim_step}")
+                        
+                        # Auto-convert to safetensors
+                        convert_lora_pt_to_safetensors(pt_path)
                     else:
                         # Save full model
                         ckpt_sd = base_model_sd.copy()
@@ -1159,6 +1183,11 @@ def main():
         final_path = out_dir / f"{base_name}_lora.pt"
         torch.save(lora_state, final_path)
         print(f"Final LoRA saved to: {final_path}")
+        
+        # Auto-convert to safetensors
+        st_path = convert_lora_pt_to_safetensors(pt_path)
+        if st_path:
+            print(f"Final LoRA (safetensors) saved to: {st_path}")
     else:
         # Save full model
         final_path = out_dir / f"{base_name}.safetensors"
