@@ -13,3 +13,4 @@ scipy
 pandas
 PyQt6
 matplotlib
+peft
