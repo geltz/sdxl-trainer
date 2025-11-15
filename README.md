@@ -10,7 +10,7 @@ Features:
 - RavenAdamW buffers stored in fp32.  
 - Optimizer state offload frequency.
 - Optional reflection padding for EQ-VAE.    
-- Neutral theme with squared borders.
+- Neutral blue theme.
 - Bonus utility scripts.    
 
 Usage:
