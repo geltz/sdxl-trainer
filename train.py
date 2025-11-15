@@ -36,8 +36,12 @@ import numpy as np
 
 import config as default_config
 
-from optimizer.lora import inject_lora_into_unet, extract_lora_state_dict
+from optimizer.lora import (
+    inject_lora_peft,
+    extract_lora_state_dict_comfy_peft,
+)
 from safetensors.torch import save_file as save_safetensors
+
 
 def convert_lora_pt_to_safetensors(pt_path):
     """Convert LoRA .pt to .safetensors immediately after saving."""
@@ -926,34 +930,28 @@ def main():
 
     # 7) param selection / LoRA injection
     use_lora = getattr(config, "USE_LORA", False)
-    lora_layers = []
 
     if use_lora:
         print("=" * 40)
-        print("LoRA MODE ENABLED")
+        print("LoRA MODE ENABLED (PEFT)")
         print("=" * 40)
-        
-        # Freeze all UNet params first
-        for param in unet.parameters():
-            param.requires_grad = False
-        
-        # Inject LoRA
-        lora_layers = inject_lora_into_unet(
+
+        # Wrap UNet with PEFT LoRA adapters
+        unet = inject_lora_peft(
             unet,
-            rank=getattr(config, "LORA_RANK", 16),
-            alpha=getattr(config, "LORA_ALPHA", 16),
-            dropout=getattr(config, "LORA_DROPOUT", 0.0),
-            target_modules=getattr(config, "LORA_TARGET_MODULES", ["to_q", "to_k", "to_v", "to_out.0"])
+            config,
+            target_modules=getattr(config, "LORA_TARGET_MODULES", None),
         )
-        
-        # Collect LoRA params
-        params_to_opt = []
-        for name, lora in lora_layers:
-            params_to_opt.extend([p for p in lora.parameters() if p.requires_grad])
-        
+
+        # Collect only trainable (LoRA) params
+        params_to_opt = [p for p in unet.parameters() if p.requires_grad]
+
+        trainable_names = [n for n, p in unet.named_parameters() if p.requires_grad]
+        frozen_names = [n for n, p in unet.named_parameters() if not p.requires_grad]
+
         train_params = sum(p.numel() for p in params_to_opt)
         total_params = sum(p.numel() for p in unet.parameters())
-        
+
         print(f"Total UNet params: {total_params / 1e6:.2f}M")
         print(f"Trainable LoRA params: {train_params / 1e6:.2f}M ({train_params/total_params*100:.4f}%)")
         
@@ -1017,8 +1015,8 @@ def main():
     is_flow_matching = config.PREDICTION_TYPE == "flow_matching"
 
     if use_lora:
-        # For LoRA, watch the first LoRA parameter
-        watch_name = lora_layers[0][0] + ".lora.lora_down.weight"
+        # For LoRA, watch the first trainable (LoRA) parameter
+        watch_name = trainable_names[0]
         test_param = dict(unet.named_parameters())[watch_name]
     else:
         watch_name = trainable_names[0]
@@ -1153,8 +1151,8 @@ def main():
                     )
                     
                     if use_lora:
-                        # Save LoRA weights
-                        lora_state = extract_lora_state_dict(unet)
+                        # Save LoRA weights (ComfyUI-compatible keys from PEFT)
+                        lora_state = extract_lora_state_dict_comfy_peft(unet)
                         pt_path = ckpt_dir / f"{ckpt_name}_lora.pt"
                         torch.save(lora_state, pt_path)
                         print(f"\nSaved LoRA checkpoint at step {current_optim_step}")
@@ -1195,11 +1193,11 @@ def main():
     
     if use_lora:
         # Watch first LoRA parameter
-        watch_name = lora_layers[0][0] + ".lora.lora_down.weight"
+        watch_name = trainable_names[0]
         test_param = dict(unet.named_parameters())[watch_name]
 
-        # Save LoRA
-        lora_state = extract_lora_state_dict(unet)
+        # Save LoRA (ComfyUI-compatible keys from PEFT)
+        lora_state = extract_lora_state_dict_comfy_peft(unet)
         final_path = out_dir / f"{base_name}_lora.pt"
         torch.save(lora_state, final_path)
         print(f"Final LoRA saved to: {final_path}")
