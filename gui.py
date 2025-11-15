@@ -2108,19 +2108,47 @@ class TrainingGUI(QtWidgets.QWidget):
             self.widgets["NOISE_OFFSET"].setEnabled(enabled)
 
 
-
-
-
     def _update_and_clamp_lr_graph(self):
-        if not hasattr(self, 'lr_curve_widget'): return
-        try: steps = int(self.widgets["MAX_TRAIN_STEPS"].text())
-        except (ValueError, KeyError): steps = 1
-        try: min_lr = float(self.widgets["LR_GRAPH_MIN"].text())
-        except (ValueError, KeyError): min_lr = 0.0
-        try: max_lr = float(self.widgets["LR_GRAPH_MAX"].text())
-        except (ValueError, KeyError): max_lr = 1e-6
+        if not hasattr(self, 'lr_curve_widget'): 
+            return
+        
+        try: 
+            steps = int(self.widgets["MAX_TRAIN_STEPS"].text().strip())
+            if steps <= 0:
+                steps = 1
+        except (ValueError, KeyError, AttributeError): 
+            steps = 1
+        
+        try: 
+            min_lr_text = self.widgets["LR_GRAPH_MIN"].text().strip()
+            if not min_lr_text:
+                min_lr = 0.0
+            else:
+                min_lr = float(min_lr_text)
+                if min_lr < 0:
+                    min_lr = 0.0
+        except (ValueError, KeyError, AttributeError): 
+            min_lr = 0.0
+        
+        try: 
+            max_lr_text = self.widgets["LR_GRAPH_MAX"].text().strip()
+            if not max_lr_text:
+                max_lr = 1e-6
+            else:
+                max_lr = float(max_lr_text)
+                if max_lr <= min_lr:
+                    max_lr = min_lr + 1e-6
+        except (ValueError, KeyError, AttributeError): 
+            max_lr = 1e-6
+        
+        # Ensure max_lr is always greater than min_lr
+        if max_lr <= min_lr:
+            max_lr = min_lr + 1e-6
+        
         self.lr_curve_widget.set_bounds(steps, min_lr, max_lr)
-        self.lr_curve_widget.set_points(self.current_config.get("LR_CUSTOM_CURVE", []))
+        curve_points = self.current_config.get("LR_CUSTOM_CURVE", [])
+        if curve_points:
+            self.lr_curve_widget.set_points(curve_points)
         self._update_epoch_markers_on_graph()
     
     def _update_epoch_markers_on_graph(self):
@@ -2203,7 +2231,7 @@ class TrainingGUI(QtWidgets.QWidget):
         else:
             config_path = ""
 
-        # NEW: if user didn’t type a config, infer it from the dropdown
+        # NEW: if user didn't type a config, infer it from the dropdown
         if not config_path:
             import os
             idx = self.config_dropdown.currentIndex()
@@ -2235,6 +2263,9 @@ class TrainingGUI(QtWidgets.QWidget):
 
         self.process_runner = ProcessRunner(exe, args, cwd, env)
 
+        # FIX: Enable/disable buttons
+        self.start_button.setEnabled(False)
+        self.stop_button.setEnabled(True)
 
         # existing GUI connections
         self.process_runner.logSignal.connect(self.log)
@@ -2246,6 +2277,11 @@ class TrainingGUI(QtWidgets.QWidget):
         self.process_runner.paramInfoSignal.connect(self._handle_param_info)
 
         self.process_runner.start()
+        
+        # Enable sleep prevention on Windows
+        if os.name == 'nt':
+            prevent_sleep(True)
+        
         if hasattr(self, "log"):
             self.log("[gui] training started\n")
 
@@ -2331,13 +2367,15 @@ class TrainingGUI(QtWidgets.QWidget):
             self.process_runner.quit()
             self.process_runner.wait()
             self.process_runner = None
+        
         status = "successfully" if exit_code == 0 else f"with an error (Code: {exit_code})"
         self.log(f"\n" + "="*50 + f"\nTraining finished {status}.\n" + "="*50)
         self.param_info_label.setText("Parameters: (training complete)" if exit_code == 0 else "Parameters: (training failed or stopped)")
+        
+        # FIX: Reset button states
         self.start_button.setEnabled(True)
         self.stop_button.setEnabled(False)
         
-
         if hasattr(self, 'dataset_manager'):
             self.dataset_manager.refresh_cache_buttons()
         
