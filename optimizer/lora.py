@@ -25,6 +25,9 @@ def inject_lora_into_unet(unet, rank: int, alpha: float, dropout: float, target_
     """Inject LoRA layers into UNet."""
     lora_layers = []
     
+    # Get the device from the UNet parameters
+    device = next(unet.parameters()).device
+    
     # Collect target modules first
     targets = []
     for name, module in unet.named_modules():
@@ -39,7 +42,7 @@ def inject_lora_into_unet(unet, rank: int, alpha: float, dropout: float, target_
             rank,
             alpha,
             dropout
-        )
+        ).to(device)  # Move LoRA layer to the same device as UNet
         
         # Store original forward
         original_forward = module.forward
