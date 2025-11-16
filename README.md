@@ -4,23 +4,23 @@ Modified from [Aozora](https://github.com/Hysocs/Aozora_SDXL_Training) for perso
 
 Features:    
 
-- Precomputed latent caching.
-- Resume state from a training checkpoint.    
-- UNet layer exclusion via keyword filter.
-- Live statistics for learning rate, gradient norms and loss.    
+- Precomputed latent caching
+- Resume state from a training checkpoint   
+- UNet layer exclusion via keyword filter
+- Live statistics for learning rate, gradient norms and loss    
 
 Additional features:  
 
-- LoRA Mode (minimal toggle that freezes layers).
-- Tag caption dropout with wildcards.    
-- More timestep sampling choices.
-- Flow matching with FlowMatchEulerDiscrete scheduler.  
-- Optimizer buffers stored in fp32.  
-- Optimizer state offload frequency.
-- Optional reflection padding for EQ-VAE.
-- Improved GUI with neutral blue theme.
-- Headless mode via cli wrapper.     
-- Bonus utility scripts.    
+- LoRA Mode (minimal toggle that freezes layers)
+- Tag caption dropout with wildcards    
+- More timestep sampling choices
+- Flow matching with FlowMatchEulerDiscrete scheduler  
+- Optimizer buffers stored in fp32 
+- Optimizer state offload frequency
+- Optional reflection padding for EQ-VAE
+- Improved GUI with neutral light theme
+- Headless mode via cli wrapper     
+- Bonus utility scripts    
 
 Usage:
 
