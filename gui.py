@@ -1328,10 +1328,6 @@ class TrainingGUI(QtWidgets.QWidget):
         self.log_textbox.setReadOnly(True)
         self.log_textbox.setMinimumHeight(200)
         self.main_layout.addWidget(title_label)
-        self.param_info_label = QtWidgets.QLabel("Parameters: (awaiting training start)")
-        self.param_info_label.setObjectName("ParamInfoLabel")
-        self.param_info_label.setAlignment(QtCore.Qt.AlignmentFlag.AlignCenter)
-        self.param_info_label.setContentsMargins(0, 5, 0, 0)
         self.tab_view = QtWidgets.QTabWidget()
         dataset_content_widget = QtWidgets.QWidget()
         self._populate_dataset_tab(dataset_content_widget)
@@ -2129,13 +2125,6 @@ class TrainingGUI(QtWidgets.QWidget):
     
     def _populate_console_tab(self, layout):
         layout.setContentsMargins(15, 15, 15, 15)
-        param_group = QtWidgets.QGroupBox("Parameter Info")
-        param_group_layout = QtWidgets.QVBoxLayout(param_group)
-        param_group_layout.setContentsMargins(5, 5, 5, 5)
-        self.param_info_label.setWordWrap(True)
-        self.param_info_label.setAlignment(QtCore.Qt.AlignmentFlag.AlignLeft)
-        param_group_layout.addWidget(self.param_info_label)
-        layout.addWidget(param_group, stretch=0)
         layout.addWidget(self.log_textbox, stretch=1)
         button_layout = QtWidgets.QHBoxLayout()
         
@@ -2401,13 +2390,13 @@ class TrainingGUI(QtWidgets.QWidget):
         if text:
             self.append_log(text, replace=is_progress and self.last_line_is_progress)
             self.last_line_is_progress = is_progress
-            
+    
+    # kept for backwards compat
     def _handle_param_info(self, text: str) -> None:
         """Slot connected to ProcessRunner.paramInfoSignal to update the UI label."""
-        if not text:
-            return
-        self.param_info_label.setText(text)
-
+        pass  # No-op since we removed the label
+    
+    # kept for backwards compat
     def gui_param_info(info: str) -> None:
         """Emit parameter info in the format the GUI expects."""
         print(f"GUI_PARAM_INFO::{info}", flush=True)
@@ -2575,7 +2564,6 @@ class TrainingGUI(QtWidgets.QWidget):
         
         status = "successfully" if exit_code == 0 else f"with an error (Code: {exit_code})"
         self.log(f"\n" + "="*50 + f"\nTraining finished {status}.\n" + "="*50)
-        self.param_info_label.setText("Parameters: (training complete)" if exit_code == 0 else "Parameters: (training failed or stopped)")
         
         # FIX: Reset button states
         self.start_button.setEnabled(True)
