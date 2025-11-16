@@ -6,7 +6,10 @@ Features:
 
 - Precomputed latent caching.
 - Resume state from a training checkpoint.    
-- UNet layer exclusion via keyword filter.    
+- UNet layer exclusion via keyword filter.
+
+Additional features:  
+
 - LoRA Mode (minimal toggle that freezes layers).
 - Tag caption dropout with wildcards.    
 - More timestep sampling choices.
