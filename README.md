@@ -4,6 +4,7 @@ Modified from [Aozora](https://github.com/Hysocs/Aozora_SDXL_Training) for perso
 
 Features:    
 
+- UNet layer exclusion via keyword filter.    
 - LoRA Mode (minimal toggle that freezes UNet layers).
 - Tag caption dropout with wildcards.    
 - More timestep sampling choices.
