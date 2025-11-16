@@ -1,180 +1,92 @@
-# if you have a folder with lots of .txt captions this lets you generate new prompts using markov chains.
-
 import os
 import random
 from collections import defaultdict, Counter
 from pathlib import Path
-import re
+from concurrent.futures import ProcessPoolExecutor
 
-def build_markov_chain(tokens, order=2):
-    """Build Markov chain from token list with configurable order"""
-    if order < 1:
-        raise ValueError("Order must be at least 1")
-    
+def build_chain_streaming(files, order=2):
+    """Build chain directly from files"""
     chain = defaultdict(Counter)
+    window = []
     
-    for i in range(len(tokens) - order):
-        # Use tuple of n tokens as key (where n = order)
-        key = tuple(tokens[i:i + order])
-        next_token = tokens[i + order]
-        chain[key][next_token] += 1
-    
+    for file in files:
+        try:
+            with open(file, 'r', encoding='utf-8') as f:
+                tokens = [t.strip() for t in f.read().replace('\n', ',').split(',') if t.strip()]
+                for token in tokens:
+                    window.append(token)
+                    if len(window) > order:
+                        chain[tuple(window[-order-1:-1])][window[-1]] += 1
+        except:
+            pass
     return chain
 
-def generate_prompt(chain, length=15, order=2, start_with=None):
-    """Generate new prompt using Markov chain with improved logic"""
+def merge_chains(chain1, chain2):
+    """Merge two chains"""
+    result = defaultdict(Counter, chain1)
+    for key, counter in chain2.items():
+        result[key].update(counter)
+    return result
+
+def generate_prompt(chain, length=15, order=2):
+    """Generate prompt from chain"""
     if not chain:
         return ""
     
-    # Convert chain from Counter to probability-based selection
-    prob_chain = {}
-    for key, counter in chain.items():
-        total = sum(counter.values())
-        prob_chain[key] = [(token, count/total) for token, count in counter.items()]
-    
-    # Start with a random key or find one that starts with desired token
-    if start_with:
-        # Find keys that start with the desired token
-        matching_keys = [key for key in chain.keys() 
-                        if key[0].lower().startswith(start_with.lower())]
-        current_key = random.choice(matching_keys) if matching_keys else random.choice(list(chain.keys()))
-    else:
-        current_key = random.choice(list(chain.keys()))
-    
+    current_key = random.choice(list(chain.keys()))
     result = list(current_key)
     
     for _ in range(length - order):
-        if current_key in prob_chain:
-            # Weighted random choice based on frequency
-            choices, weights = zip(*[(token, weight) for token, weight in prob_chain[current_key]])
-            next_token = random.choices(choices, weights=weights, k=1)[0]
-            result.append(next_token)
-            
-            # Update the current key (slide the window)
-            current_key = tuple(result[-order:])
-        else:
-            # If we hit a dead end, try to continue from a random point
-            available_keys = [key for key in chain.keys() 
-                            if key[0] == result[-1] or any(token in result for token in key)]
-            if available_keys:
-                current_key = random.choice(available_keys)
-                # Add the remaining tokens from the new key (excluding the first which we already have)
-                result.extend(current_key[1:])
-            else:
-                break
+        if current_key not in chain:
+            break
+        counter = chain[current_key]
+        choices, weights = zip(*counter.items())
+        result.append(random.choices(choices, weights=weights)[0])
+        current_key = tuple(result[-order:])
     
-    # Clean up the result
-    prompt = clean_prompt(result)
-    return prompt
-
-def clean_prompt(tokens):
-    """Clean and format the prompt tokens"""
-    # Remove duplicates while preserving order (to avoid repetition)
     seen = set()
-    unique_tokens = []
-    for token in tokens:
-        if token not in seen:
-            seen.add(token)
-            unique_tokens.append(token)
-    
-    # Join and escape parentheses
-    prompt = ", ".join(unique_tokens)
-    prompt = prompt.replace("(", r"\(").replace(")", r"\)")
-    
-    # Remove excessive commas and spaces
-    prompt = re.sub(r',\s*,', ', ', prompt)
-    prompt = prompt.strip(', ')
-    
-    return prompt
-
-def find_txt_files(folder):
-    """Recursively find all .txt files"""
-    return list(Path(folder).rglob("*.txt"))
-
-def is_token_file(filepath):
-    """Check if file contains comma-separated tokens"""
-    try:
-        with open(filepath, 'r', encoding='utf-8') as f:
-            content = f.read().strip()
-            return ',' in content and len(content) > 10  # Basic validation
-    except:
-        return False
+    unique = [t for t in result if not (t in seen or seen.add(t))]
+    return ", ".join(unique).replace("(", r"\(").replace(")", r"\)")
 
 def get_next_filename():
-    """Find next available promptgen_x.txt filename"""
+    """Find next available promptgen_x.txt"""
     i = 1
     while os.path.exists(f"promptgen_{i}.txt"):
         i += 1
     return f"promptgen_{i}.txt"
 
-def analyze_tokens(tokens):
-    """Analyze token statistics"""
-    if not tokens:
-        return {}
-    
-    token_counts = Counter(tokens)
-    total_tokens = len(tokens)
-    unique_tokens = len(token_counts)
-    
-    print(f"token analysis:")
-    print(f"  total tokens: {total_tokens}")
-    print(f"  unique tokens: {unique_tokens}")
-    print(f"  most common tokens: {token_counts.most_common(10)}")
-    
-    return {
-        'total_tokens': total_tokens,
-        'unique_tokens': unique_tokens,
-        'token_counts': token_counts
-    }
+def build_chain_wrapper(args):
+    """Wrapper for parallel execution"""
+    batch, order = args
+    return build_chain_streaming(batch, order)
 
-def main(folder_path=".", order=2, prompt_length=15, num_prompts=10):
-    txt_files = find_txt_files(folder_path)
-    all_tokens = []
-    
+def main(folder_path=".", order=2, prompt_length=15, num_prompts=10, max_workers=None):
+    txt_files = list(Path(folder_path).rglob("*.txt"))
     print(f"found {len(txt_files)} text files")
     
-    for file in txt_files:
-        if is_token_file(file):
-            try:
-                with open(file, 'r', encoding='utf-8') as f:
-                    content = f.read().strip()
-                    # More robust token parsing
-                    tokens = [t.strip() for t in re.split(r',|\n', content) if t.strip()]
-                    all_tokens.extend(tokens)
-                    # print(f"  loaded {len(tokens)} tokens from {file.name}")
-            except Exception as e:
-                print(f"  error reading {file}: {e}")
+    num_workers = max_workers or os.cpu_count()
+    batch_size = max(1, len(txt_files) // num_workers)
+    file_batches = [txt_files[i:i + batch_size] for i in range(0, len(txt_files), batch_size)]
     
-    if not all_tokens:
-        print("no valid token files found")
-        return
+    print(f"processing with {num_workers} workers")
     
-    # Analyze tokens
-    analysis = analyze_tokens(all_tokens)
+    with ProcessPoolExecutor(max_workers=num_workers) as executor:
+        chains = list(executor.map(build_chain_wrapper, [(b, order) for b in file_batches]))
     
-    if analysis['unique_tokens'] < order + 1:
-        print(f"warning: not enough unique tokens for order {order}. using order 1.")
-        order = 1
+    print("merging chains...")
+    chain = chains[0]
+    for c in chains[1:]:
+        chain = merge_chains(chain, c)
     
-    chain = build_markov_chain(all_tokens, order)
+    print(f"chain has {len(chain)} states, generating prompts...")
+    
     output_file = get_next_filename()
-    
-    print(f"generated markov chain with order {order}")
-    print(f"chain has {len(chain)} unique states")
-    
     with open(output_file, 'w', encoding='utf-8') as f:
         for i in range(num_prompts):
             prompt = generate_prompt(chain, length=prompt_length, order=order)
             f.write(f"{i+1}: {prompt}\n\n")
-            print(f"generated prompt {i+1}")
     
     print(f"generated {num_prompts} prompts in {output_file}")
 
 if __name__ == "__main__":
-    # You can customize these parameters
-    main(
-        folder_path=".",
-        order=2,           # Higher order = more context awareness
-        prompt_length=15,  # Target prompt length
-        num_prompts=10     # Number of prompts to generate
-    )
+    main(folder_path=".", order=2, prompt_length=15, num_prompts=10, max_workers=None)
