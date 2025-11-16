@@ -70,13 +70,10 @@
         "to_v",
         "to_out.0"
     ],
+    "TAG_DROPOUT_RATE": 0.1,
+    "TAG_DROPOUT_WHITELIST": "*girl*, *boy*, solo, masterpiece",
     "RESUME_TRAINING": false,
-    "INSTANCE_DATASETS": [
-        {
-            "path": "lora_tagged",
-            "repeats": 4
-        }
-    ],
+    "INSTANCE_DATASETS": [],
     "OPTIMIZER_TYPE": "raven",
     "RAVEN_PARAMS": {
         "betas": [
