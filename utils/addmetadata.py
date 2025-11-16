@@ -17,8 +17,9 @@ metadata = {
     "modelspec.description": "description",
     "modelspec.author": "author",
     "modelspec.date": "yyyy-mm-dd",
-    "modelspec.prediction_type": "v",
+    "modelspec.prediction_type": "epsilon",
 }
 
 # 3. resave with metadata
+
 save_file(tensors, dst_path, metadata=metadata)
