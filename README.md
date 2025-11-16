@@ -7,6 +7,7 @@ Features:
 - Precomputed latent caching.
 - Resume state from a training checkpoint.    
 - UNet layer exclusion via keyword filter.
+- Live statistics for learning rate, gradient norms and loss.    
 
 Additional features:  
 
