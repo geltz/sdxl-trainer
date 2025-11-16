@@ -1,8 +1,8 @@
 {
-    "SINGLE_FILE_CHECKPOINT_PATH": "NoobAI-RectifiedFlow-test-step486k.safetensors",
+    "SINGLE_FILE_CHECKPOINT_PATH": "D:/sdxl-models/NoobAI-RectifiedFlow-test-step486k.safetensors",
     "VAE_PATH": "",
     "USE_REFLECTION_PADDING": true,
-    "OUTPUT_DIR": "sdxl-trainer",
+    "OUTPUT_DIR": "D:/sdxl-trainer/output",
     "RESUME_MODEL_PATH": "",
     "RESUME_STATE_PATH": "",
     "CACHING_BATCH_SIZE": 1,
@@ -70,10 +70,12 @@
         "to_v",
         "to_out.0"
     ],
+    "TAG_DROPOUT_RATE": 0.1,
+    "TAG_DROPOUT_WHITELIST": "*girl*, *boy*, solo, masterpiece",
     "RESUME_TRAINING": false,
     "INSTANCE_DATASETS": [
         {
-            "path": "tagged",
+            "path": "D:/sdxl-dataset",
             "repeats": 1
         }
     ],
@@ -103,7 +105,4 @@
         "relative_step": false,
         "warmup_init": false
     }
-
 }
-
-
