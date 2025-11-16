@@ -1,3 +1,6 @@
+# generate new prompts using markov chains
+# uses .txt files that have comma-separated captions
+
 import os
 import random
 from collections import defaultdict, Counter
