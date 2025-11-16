@@ -5,7 +5,7 @@ Modified from [Aozora](https://github.com/Hysocs/Aozora_SDXL_Training) for perso
 Features:    
 
 - UNet layer exclusion via keyword filter.    
-- LoRA Mode (minimal toggle that freezes UNet layers).
+- LoRA Mode (minimal toggle that freezes layers).
 - Tag caption dropout with wildcards.    
 - More timestep sampling choices.
 - Flow matching with FlowMatchEulerDiscrete scheduler.  
