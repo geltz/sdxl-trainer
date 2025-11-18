@@ -4,6 +4,7 @@ Modified from [Aozora](https://github.com/Hysocs/Aozora_SDXL_Training) for perso
 
 Features:    
 
+- Custom optimizer that offloads to CPU for less VRAM use      
 - Precomputed latent caching    
 - Resume state from a training checkpoint   
 - UNet layer exclusion via keyword filter
