@@ -1,8 +1,8 @@
 {
-    "SINGLE_FILE_CHECKPOINT_PATH": "seelepop3.safetensors",
+    "SINGLE_FILE_CHECKPOINT_PATH": "saeri_v1.safetensors",
     "VAE_PATH": "",
     "USE_REFLECTION_PADDING": false,
-    "OUTPUT_DIR": "output",
+    "OUTPUT_DIR": "loras",
     "RESUME_MODEL_PATH": "",
     "RESUME_STATE_PATH": "",
     "CACHING_BATCH_SIZE": 1,
@@ -13,10 +13,10 @@
     "NOISE_SCHEDULER": "DDPMScheduler",
     "PREDICTION_TYPE": "v_prediction",
     "BETA_SCHEDULE": "scaled_linear",
-    "MAX_TRAIN_STEPS": 6000,
-    "LEARNING_RATE": 3e-05,
+    "MAX_TRAIN_STEPS": 3000,
+    "LEARNING_RATE": 0.0001,
     "BATCH_SIZE": 1,
-    "GRADIENT_ACCUMULATION_STEPS": 16,
+    "GRADIENT_ACCUMULATION_STEPS": 6,
     "MIXED_PRECISION": "bfloat16",
     "CLIP_GRAD_NORM": 1.0,
     "SEED": 333,
@@ -28,23 +28,23 @@
     "LR_CUSTOM_CURVE": [
         [
             0.0,
-            1.5e-06
+            1e-05
         ],
         [
-            0.15,
-            3e-05
+            0.1,
+            0.0001
         ],
         [
-            0.85,
-            3e-05
+            0.9,
+            0.0001
         ],
         [
             1.0,
-            8e-07
+            1e-05
         ]
     ],
     "LR_GRAPH_MIN": 0.0,
-    "LR_GRAPH_MAX": 5e-05,
+    "LR_GRAPH_MAX": 0.00015,
     "MEMORY_EFFICIENT_ATTENTION": "sdpa",
     "USE_ZERO_TERMINAL_SNR": true,
     "GRAD_SPIKE_THRESHOLD_HIGH": 20.0,
@@ -60,11 +60,11 @@
     "TIMESTEP_SAMPLING_METHOD": "Uniform LogSNR",
     "LOGIT_NORMAL_MEAN": 0.0,
     "LOGIT_NORMAL_STD": 1.0,
-    "USE_LORA": false,
-    "LORA_TYPE": "LoRA",
+    "USE_LORA": true,
+    "LORA_TYPE": "LoCon",
     "LORA_RANK": 16,
     "LORA_ALPHA": 16,
-    "LORA_DROPOUT": 0.0,
+    "LORA_DROPOUT": 0.1,
     "LORA_TARGET_MODULES": [
         "to_q",
         "to_k",

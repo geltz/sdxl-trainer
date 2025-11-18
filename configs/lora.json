@@ -61,6 +61,7 @@
     "LOGIT_NORMAL_MEAN": 0.0,
     "LOGIT_NORMAL_STD": 1.0,
     "USE_LORA": true,
+    "LORA_TYPE": "LoRA",
     "LORA_RANK": 16,
     "LORA_ALPHA": 16,
     "LORA_DROPOUT": 0.1,
@@ -70,6 +71,9 @@
         "to_v",
         "to_out.0"
     ],
+    "LOCON_RANK": 16,
+    "LOCON_ALPHA": 16,
+    "LOCON_DROPOUT": 0.0,
     "TAG_DROPOUT_RATE": 0.1,
     "TAG_DROPOUT_WHITELIST": "*girl*, *boy*, solo, masterpiece",
     "RESUME_TRAINING": false,
