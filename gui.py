@@ -1263,11 +1263,14 @@ class TrainingGUI(QtWidgets.QWidget):
         "USE_NOISE_OFFSET": {"label": "Use Noise Offset", "tooltip": "Enable to add noise offset, improving learning of very dark/bright images.", "widget": "QCheckBox"},
         "NOISE_OFFSET": {"label": "Noise Offset:", "tooltip": "Improves learning of very dark/bright images. Range: 0.0-0.15. Try 0.05 first, 0.1 for high-contrast styles.", "widget": "QLineEdit"},
         "USE_MULTISCALE_NOISE": {"label": "Use Multiscale Noise", "tooltip": "Adds coarse-scale noise patterns to improve texture learning. Works well with noise offset.", "widget": "QCheckBox"},
-        "USE_LORA": {"label": "LoRA Mode", "tooltip": "Train a LoRA instead of full model", "widget": "QCheckBox"},
+        "USE_LORA": {"label": "Use LoRA/LoCon", "tooltip": "Train an adapter instead of full model", "widget": "QCheckBox"},
+        "LORA_TYPE": {"label": "Adapter Type:", "tooltip": "Choose between LoRA or LoCon", "widget": "QComboBox", "options": ["LoRA", "LoCon"]},
         "LORA_RANK": {"label": "LoRA Rank:", "tooltip": "Rank of LoRA matrices (4-128)", "widget": "QSpinBox", "range": (1, 128)},
         "LORA_ALPHA": {"label": "LoRA Alpha:", "tooltip": "Scaling factor (typically = rank)", "widget": "QSpinBox", "range": (1, 128)},
         "LORA_DROPOUT": {"label": "LoRA Dropout:", "tooltip": "Dropout rate (0.0-0.5)", "widget": "QDoubleSpinBox", "range": (0.0, 0.5), "step": 0.1},
-        "TAG_DROPOUT_RATE": {"label": "Tag Dropout Rate:", "tooltip": "Probability of dropping each tag (0.0-1.0). Helps model learn individual tag meanings.", "widget": "QDoubleSpinBox", "range": (0.0, 0.5), "step": 0.05},
+        "LOCON_RANK": {"label": "LoCon Rank:", "tooltip": "Rank of LoCon matrices (4-128)", "widget": "QSpinBox", "range": (1, 128)},
+        "LOCON_ALPHA": {"label": "LoCon Alpha:", "tooltip": "Scaling factor (typically = rank)", "widget": "QSpinBox", "range": (1, 128)},
+        "LOCON_DROPOUT": {"label": "LoCon Dropout:", "tooltip": "Dropout rate (0.0-0.5)", "widget": "QDoubleSpinBox", "range": (0.0, 0.5), "step": 0.1},
         "TAG_DROPOUT_WHITELIST": {"label": "Tag Whitelist:", "tooltip": "Comma-separated tags protected from dropout. Supports wildcards: *girl* matches '1girl', '2girls', etc.", "widget": "QLineEdit"},
     }
     def __init__(self):
@@ -1896,15 +1899,15 @@ class TrainingGUI(QtWidgets.QWidget):
         
         main_layout.addWidget(self.adafactor_settings_group)
 
-        # --- LoRA Section ---
+        # --- Adapter Section ---
         separator = QtWidgets.QFrame()
         separator.setFrameShape(QtWidgets.QFrame.Shape.HLine)
         separator.setStyleSheet("border: 1px solid #8fa8c7; margin: 10px 0;")
         main_layout.addWidget(separator)
 
-        lora_container = QtWidgets.QWidget()
-        lora_layout = QtWidgets.QVBoxLayout(lora_container)
-        lora_layout.setContentsMargins(0, 0, 0, 0)
+        adapter_container = QtWidgets.QWidget()
+        adapter_layout = QtWidgets.QVBoxLayout(adapter_container)
+        adapter_layout.setContentsMargins(0, 0, 0, 0)
 
         # Toggle with frozen indicator
         label, widget = self._create_widget("USE_LORA")
@@ -1912,7 +1915,6 @@ class TrainingGUI(QtWidgets.QWidget):
         toggle_layout.addWidget(label)
         toggle_layout.addWidget(widget)
 
-        # Frozen indicator label
         self.lora_frozen_indicator = QtWidgets.QLabel("(UNet Frozen)")
         self.lora_frozen_indicator.setStyleSheet("""
             color: #c74440;
@@ -1922,23 +1924,42 @@ class TrainingGUI(QtWidgets.QWidget):
         """)
         self.lora_frozen_indicator.setVisible(False)
         toggle_layout.addWidget(self.lora_frozen_indicator)
-
         toggle_layout.addStretch()
-        lora_layout.addLayout(toggle_layout)
+        adapter_layout.addLayout(toggle_layout)
 
-        # Settings group
+        # Adapter type selector
+        self.adapter_type_container = QtWidgets.QWidget()
+        adapter_type_layout = QtWidgets.QHBoxLayout(self.adapter_type_container)
+        adapter_type_layout.setContentsMargins(0, 5, 0, 5)
+        type_label, type_widget = self._create_widget("LORA_TYPE")
+        adapter_type_layout.addWidget(type_label)
+        adapter_type_layout.addWidget(type_widget, 1)
+        adapter_layout.addWidget(self.adapter_type_container)
+        self.adapter_type_container.setVisible(False)
+
+        # LoRA Settings group
         self.lora_settings_group = QtWidgets.QGroupBox("LoRA Settings")
         lora_settings_layout = QtWidgets.QFormLayout(self.lora_settings_group)
-
         for key in ["LORA_RANK", "LORA_ALPHA", "LORA_DROPOUT"]:
             label, widget = self._create_widget(key)
             lora_settings_layout.addRow(label, widget)
+        adapter_layout.addWidget(self.lora_settings_group)
+        self.lora_settings_group.setVisible(False)
 
-        lora_layout.addWidget(self.lora_settings_group)
-        main_layout.addWidget(lora_container)
+        # LoCon Settings group
+        self.locon_settings_group = QtWidgets.QGroupBox("LoCon Settings")
+        locon_settings_layout = QtWidgets.QFormLayout(self.locon_settings_group)
+        for key in ["LOCON_RANK", "LOCON_ALPHA", "LOCON_DROPOUT"]:
+            label, widget = self._create_widget(key)
+            locon_settings_layout.addRow(label, widget)
+        adapter_layout.addWidget(self.locon_settings_group)
+        self.locon_settings_group.setVisible(False)
 
-        # Connect toggle
-        self.widgets["USE_LORA"].stateChanged.connect(self._toggle_lora_widgets)
+        main_layout.addWidget(adapter_container)
+
+        # Connect signals
+        self.widgets["USE_LORA"].stateChanged.connect(self._toggle_adapter_widgets)
+        self.widgets["LORA_TYPE"].currentTextChanged.connect(self._toggle_adapter_type)
 
         return optimizer_group
     
@@ -1948,11 +1969,30 @@ class TrainingGUI(QtWidgets.QWidget):
         self.raven_settings_group.setVisible(is_raven)
         self.adafactor_settings_group.setVisible(not is_raven)
 
-    def _toggle_lora_widgets(self):
-        is_lora = self.widgets["USE_LORA"].isChecked()
-        self.lora_settings_group.setVisible(is_lora)
+    def _toggle_adapter_widgets(self):
+        is_adapter = self.widgets["USE_LORA"].isChecked()
+        
+        self.adapter_type_container.setVisible(is_adapter)
         if hasattr(self, 'lora_frozen_indicator'):
-            self.lora_frozen_indicator.setVisible(is_lora)
+            self.lora_frozen_indicator.setVisible(is_adapter)
+        
+        if is_adapter:
+            self._toggle_adapter_type()
+        else:
+            self.lora_settings_group.setVisible(False)
+            self.locon_settings_group.setVisible(False)
+
+    def _toggle_adapter_type(self):
+        if not self.widgets["USE_LORA"].isChecked():
+            return
+        
+        adapter_type = self.widgets["LORA_TYPE"].currentText()
+        
+        is_lora = (adapter_type == "LoRA")
+        is_locon = (adapter_type == "LoCon")
+        
+        self.lora_settings_group.setVisible(is_lora)
+        self.locon_settings_group.setVisible(is_locon)
 
     def _create_lr_scheduler_group(self):
         lr_group = QtWidgets.QGroupBox("Learning Rate Scheduler")
@@ -2228,7 +2268,7 @@ class TrainingGUI(QtWidgets.QWidget):
                     self._update_and_clamp_lr_graph()
                 
                 self._toggle_optimizer_widgets()
-                self._toggle_lora_widgets()
+                self._toggle_adapter_widgets()
                 self._toggle_flow_matching_params()
                 self._toggle_timestep_sampling_params()
                 

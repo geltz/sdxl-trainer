@@ -1,8 +1,3 @@
-    # ==================================================================================== 
-# DEFAULT CONFIGURATION 
-# Simplified configuration matching the refactored training script
-# ====================================================================================
-
 # --- Paths ---
 SINGLE_FILE_CHECKPOINT_PATH = "./model.safetensors"
 VAE_PATH = ""  # Optional separate VAE path, leave empty to use VAE from model
@@ -117,10 +112,17 @@ LOGIT_NORMAL_STD = 1.0
 
 # --- LoRA Configuration ---
 USE_LORA = False
+LORA_TYPE = "LoRA"
+
 LORA_RANK = 16
 LORA_ALPHA = 16
 LORA_DROPOUT = 0.0
 LORA_TARGET_MODULES = ["to_q", "to_k", "to_v", "to_out.0"]
+
+LOCON_RANK = 16
+LOCON_ALPHA = 16
+LOCON_DROPOUT = 0.0
+LOCON_TARGET_MODULES = None
 
 # --- Dataset Configuration ---
 TAG_DROPOUT_RATE = 0.1  # 10% chance to drop each tag

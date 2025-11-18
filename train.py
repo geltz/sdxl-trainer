@@ -40,6 +40,9 @@ from optimizer.lora import (
     inject_lora_peft,
     extract_lora_state_dict_comfy_peft,
 )
+
+from optimizer.locon import inject_locon_peft, extract_locon_state_dict_comfy_peft
+
 from safetensors.torch import save_file as save_safetensors
 
 
@@ -1059,20 +1062,28 @@ def main():
     use_lora = getattr(config, "USE_LORA", False)
 
     if use_lora:
+        adapter_type = getattr(config, "LORA_TYPE", "LoRA")
+        
         print("=" * 40)
-        print("LoRA MODE ENABLED (PEFT)")
+        print(f"{adapter_type.upper()} MODE ENABLED (PEFT)")
         print("=" * 40)
 
-        # Wrap UNet with PEFT LoRA adapters
-        unet = inject_lora_peft(
-            unet,
-            config,
-            target_modules=getattr(config, "LORA_TARGET_MODULES", None),
-        )
+        if adapter_type == "LoRA":
+            unet = inject_lora_peft(
+                unet,
+                config,
+                target_modules=getattr(config, "LORA_TARGET_MODULES", None),
+            )
+        elif adapter_type == "LoCon":
+            unet = inject_locon_peft(
+                unet,
+                config,
+                target_modules=getattr(config, "LOCON_TARGET_MODULES", None),
+            )
+        else:
+            raise ValueError(f"Unknown adapter type: {adapter_type}")
 
-        # Collect only trainable (LoRA) params
         params_to_opt = [p for p in unet.parameters() if p.requires_grad]
-
         trainable_names = [n for n, p in unet.named_parameters() if p.requires_grad]
         frozen_names = [n for n, p in unet.named_parameters() if not p.requires_grad]
 
@@ -1080,7 +1091,7 @@ def main():
         total_params = sum(p.numel() for p in unet.parameters())
 
         print(f"Total UNet params: {total_params / 1e6:.2f}M")
-        print(f"Trainable LoRA params: {train_params / 1e6:.2f}M ({train_params/total_params*100:.4f}%)")
+        print(f"Trainable {adapter_type} params: {train_params / 1e6:.2f}M ({train_params/total_params*100:.4f}%)")
 
     else:
         # Original full-model training
@@ -1272,18 +1283,18 @@ def main():
                     )
                     
                     if use_lora:
-                        # Save LoRA weights (ComfyUI-compatible keys from PEFT)
-                        lora_state = extract_lora_state_dict_comfy_peft(unet)
-                        pt_path = ckpt_dir / f"{ckpt_name}_lora.pt"
-                        torch.save(lora_state, pt_path)
-                        # Key check
-                        print(f"\nSaved {len(lora_state)} keys")
-                        print("First 5 keys:")
-                        for k in list(lora_state.keys())[:5]:
-                            print(f"  {k}")
-                        print(f"\nSaved LoRA checkpoint at step {current_optim_step}")
+                        adapter_type = getattr(config, "LORA_TYPE", "LoRA")
                         
-                        # Auto-convert to safetensors
+                        if adapter_type == "LoRA":
+                            lora_state = extract_lora_state_dict_comfy_peft(unet)
+                            pt_path = ckpt_dir / f"{ckpt_name}_lora.pt"
+                        elif adapter_type == "LoCon":
+                            lora_state = extract_locon_state_dict_comfy_peft(unet)
+                            pt_path = ckpt_dir / f"{ckpt_name}_locon.pt"
+                        
+                        torch.save(lora_state, pt_path)
+                        print(f"\nSaved {adapter_type} checkpoint at step {current_optim_step}")
+                        
                         convert_lora_pt_to_safetensors(pt_path)
                     else:
                         # Save full model
@@ -1316,22 +1327,23 @@ def main():
         {"step": final_optim_step, "optimizer_state_dict": optimizer.state_dict()},
         out_dir / f"{base_name}_state.pt",
     )
-    
+
     if use_lora:
-        # Watch first LoRA parameter
-        watch_name = trainable_names[0]
-        test_param = dict(unet.named_parameters())[watch_name]
+        adapter_type = getattr(config, "LORA_TYPE", "LoRA")
+        
+        if adapter_type == "LoRA":
+            adapter_state = extract_lora_state_dict_comfy_peft(unet)
+            final_path = out_dir / f"{base_name}_lora.pt"
+        elif adapter_type == "LoCon":
+            adapter_state = extract_locon_state_dict_comfy_peft(unet)
+            final_path = out_dir / f"{base_name}_locon.pt"
+        
+        torch.save(adapter_state, final_path)
+        print(f"Final {adapter_type} saved to: {final_path}")
 
-        # Save LoRA (ComfyUI-compatible keys from PEFT)
-        lora_state = extract_lora_state_dict_comfy_peft(unet)
-        final_path = out_dir / f"{base_name}_lora.pt"
-        torch.save(lora_state, final_path)
-        print(f"Final LoRA saved to: {final_path}")
-
-        # Auto-convert to safetensors
         st_path = convert_lora_pt_to_safetensors(final_path)
         if st_path:
-            print(f"Final LoRA (safetensors) saved to: {st_path}")
+            print(f"Final {adapter_type} (safetensors) saved to: {st_path}")
     else:
         watch_name = trainable_names[0]
         test_param = dict(unet.named_parameters())[watch_name]
