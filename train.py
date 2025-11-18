@@ -1205,11 +1205,16 @@ def main():
                 timestep_sampler.record_timesteps(timesteps)
 
                 is_flow_matching = config.PREDICTION_TYPE == "flow_matching"
-                
-                # target: noise - noisy_latents
+
                 if is_flow_matching:
-                    noisy_latents = add_flow_matching_noise(latents, noise, timesteps, noise_scheduler)
-                    target = noise - noisy_latents  # Velocity from current position
+                    # Rectified flow: x_t = (1-t)*x_0 + t*x_1
+                    # Velocity: dx/dt = x_1 - x_0 = noise - latents
+                    t = timesteps.float() / (noise_scheduler.config.num_train_timesteps - 1)
+                    while len(t.shape) < len(latents.shape):
+                        t = t.unsqueeze(-1)
+                    
+                    noisy_latents = (1.0 - t) * latents + t * noise
+                    target = noise - latents  # Constant velocity vector
                 else:
                     noisy_latents = noise_scheduler.add_noise(latents, noise, timesteps)
                     target = noise_scheduler.get_velocity(latents, noise, timesteps) if is_v_pred else noise
@@ -1251,8 +1256,9 @@ def main():
                     or raw_norm < config.GRAD_SPIKE_THRESHOLD_LOW
                 )
 
+                # Only log anomalies when *not* in LoRA mode
                 if is_grad_anomaly and not use_lora:
-                #    tqdm.write("\n=== GRADIENT ANOMALY DETECTED ===") # this throws anomalies when loss is low; not required
+                    tqdm.write("\n=== GRADIENT ANOMALY DETECTED ===")
                     tqdm.write(f"Step: {current_optim_step}")
                     tqdm.write(f"Raw Grad Norm: {raw_norm:.4f}")
                     tqdm.write(f"Clipped Grad Norm: {clipped:.4f}")
