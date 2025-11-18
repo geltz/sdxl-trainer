@@ -8,7 +8,7 @@ Features:
 - Resume state from a training checkpoint   
 - UNet layer exclusion via keyword filter
 - Live statistics for learning rate, gradient norms and loss
-- Custom optimizer that offloads to CPU for less VRAM    
+- Custom AdamW (Raven) that offloads to CPU for less VRAM    
 
 Additional features:  
 
