@@ -3,12 +3,12 @@ UNet trainer for SDXL models that requires ~12 GB of VRAM. A bit lower if only u
 Modified from [Aozora](https://github.com/Hysocs/Aozora_SDXL_Training) for personal usage.    
 
 Features:    
-
-- Custom optimizer that offloads to CPU for less VRAM use      
+ 
 - Precomputed latent caching    
 - Resume state from a training checkpoint   
 - UNet layer exclusion via keyword filter
-- Live statistics for learning rate, gradient norms and loss    
+- Live statistics for learning rate, gradient norms and loss
+- Custom optimizer that offloads to CPU for less VRAM    
 
 Additional features:  
 
