@@ -1251,9 +1251,8 @@ def main():
                     or raw_norm < config.GRAD_SPIKE_THRESHOLD_LOW
                 )
 
-                # Only log anomalies when *not* in LoRA mode
                 if is_grad_anomaly and not use_lora:
-                    tqdm.write("\n=== GRADIENT ANOMALY DETECTED ===")
+                #    tqdm.write("\n=== GRADIENT ANOMALY DETECTED ===") # this throws anomalies when loss is low; not required
                     tqdm.write(f"Step: {current_optim_step}")
                     tqdm.write(f"Raw Grad Norm: {raw_norm:.4f}")
                     tqdm.write(f"Clipped Grad Norm: {clipped:.4f}")
