@@ -88,7 +88,7 @@ class RavenAdamW(Optimizer):
                 if grad.is_sparse: 
                     raise RuntimeError("RavenAdamW does not support sparse gradients.")
                 
-                # Grad centralization in-place in fp16/bf16
+                # Grad centralization in-place in fp32
                 if use_gc and grad.dim() > 1:
                     if grad.dim() >= 3:
                         grad_mean = grad.mean(dim=tuple(range(1, grad.dim())), keepdim=True)
@@ -103,7 +103,7 @@ class RavenAdamW(Optimizer):
                     state["step"] = 0
                 state["exp_avg_cpu"] = torch.zeros_like(
                     p, memory_format=torch.preserve_format,
-                    device='cpu', dtype=torch.float32   # was bfloat16
+                    device='cpu', dtype=torch.float32  
                 )
                 state["exp_avg_sq_cpu"] = torch.zeros_like(
                     p, memory_format=torch.preserve_format,
@@ -133,7 +133,7 @@ class RavenAdamW(Optimizer):
                 step_size = lr / bias_correction1 if bias_correction1 != 0 else lr
                 bias_correction2_sqrt = math.sqrt(bias_correction2) if bias_correction2 > 0 else 1.0
                 
-                # Work in mixed precision
+                # Work in fp32
                 if p.dtype in [torch.float16, torch.bfloat16]:
                     # Update moments in fp32
                     grad_fp32 = grad.float()
@@ -204,4 +204,5 @@ class RavenAdamW(Optimizer):
             
         state_dict['param_device'] = str(self.param_device)
         state_dict['global_step_counter'] = self.global_step_counter
+
         return state_dict
