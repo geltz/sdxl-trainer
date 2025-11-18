@@ -4,7 +4,7 @@ Modified from [Aozora](https://github.com/Hysocs/Aozora_SDXL_Training) for perso
 
 Features:    
 
-- Precomputed latent caching in fp32    
+- Precomputed latent caching    
 - Resume state from a training checkpoint   
 - UNet layer exclusion via keyword filter
 - Live statistics for learning rate, gradient norms and loss    
