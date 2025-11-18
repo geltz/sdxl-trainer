@@ -11,7 +11,7 @@ Features:
 
 Additional features:  
 
-- LoRA Mode (minimal toggle that freezes layers)
+- Train LoRAs and LoCons    
 - Tag caption dropout with wildcards    
 - More timestep sampling choices
 - Flow matching with FlowMatchEulerDiscrete scheduler  
