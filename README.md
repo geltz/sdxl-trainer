@@ -16,7 +16,7 @@ Additional features:
 - More timestep sampling choices
 - Flow matching with FlowMatchEulerDiscrete scheduler  
 - Optimizer state offload frequency
-- Optional reflection padding for EQ-VAE
+- Reflection padding for EQ-VAE
 - Improved GUI with neutral light theme
 - Headless mode via cli wrapper     
 - Bonus utility scripts    
