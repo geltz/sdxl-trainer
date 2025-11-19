@@ -1,6 +1,6 @@
 {
     "SINGLE_FILE_CHECKPOINT_PATH": "D:/sdxl-models/NoobAI-RectifiedFlow-test-step486k.safetensors",
-    "VAE_PATH": "",
+    "VAE_PATH": "D:/sdxl-models/Pad EQB7 Decoder-only-pass.safetensors",
     "VAE_SHIFT_FACTOR": 0.0,
     "USE_REFLECTION_PADDING": true,
     "OUTPUT_DIR": "D:/sdxl-trainer/output",
@@ -25,11 +25,26 @@
     "SAVE_EVERY_N_STEPS": 100,
     "UNET_EXCLUDE_TARGETS": "conv1, conv2, conv_in, conv_out",
     "LR_CUSTOM_CURVE": [
-        [0.0, 1e-07],
-        [0.05, 2e-05],
-        [0.75, 2e-05],
-        [0.90, 5e-06],
-        [1.0, 1e-07]
+        [
+            0.0,
+            1e-07
+        ],
+        [
+            0.05,
+            2e-05
+        ],
+        [
+            0.75,
+            2e-05
+        ],
+        [
+            0.9,
+            5e-06
+        ],
+        [
+            1.0,
+            1e-07
+        ]
     ],
     "LR_GRAPH_MIN": 0.0,
     "LR_GRAPH_MAX": 3e-05,
