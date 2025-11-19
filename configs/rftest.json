@@ -21,7 +21,7 @@
     "MIXED_PRECISION": "bfloat16",
     "CLIP_GRAD_NORM": 1.0,
     "SEED": 333,
-    "FLOW_MATCHING_SHIFT": 2.5,
+    "FLOW_MATCHING_SHIFT": 3.0,
     "SAVE_EVERY_N_STEPS": 100,
     "UNET_EXCLUDE_TARGETS": "conv1, conv2, conv_in, conv_out",
     "LR_CUSTOM_CURVE": [
