@@ -1226,17 +1226,22 @@ def main():
                 is_flow_matching = config.PREDICTION_TYPE == "flow_matching"
 
                 if is_flow_matching:
-                    # Rectified Flow: interpolate x_t = (1-t)*x_0 + t*x_1
-                    # Target is velocity field: v = x_1 - x_0
+                    # 1. Normalize t to [0, 1]
                     t = timesteps.float() / (noise_scheduler.config.num_train_timesteps - 1)
                     
-                    # Reshape t for broadcasting
-                    t_expanded = t.view(-1, 1, 1, 1)
+                    # 2. Retrieve Shift value (Default to 1.0 if not set, SD3/Flux use 3.0)
+                    shift_val = getattr(config, "FLOW_MATCHING_SHIFT", 1.0)
                     
-                    # Linear interpolation
+                    # 3. Apply Time-Shifting Math
+                    # Formula: t_shifted = (t * shift) / (1 + (shift - 1) * t)
+                    if shift_val != 1.0:
+                        t = (t * shift_val) / (1 + (shift_val - 1) * t)
+
+                    # 4. Interpolate x_t = (1-t)*x_0 + t*x_1
+                    t_expanded = t.view(-1, 1, 1, 1)
                     noisy_latents = (1.0 - t_expanded) * latents + t_expanded * noise
                     
-                    # Target is the velocity (constant for rectified flow)
+                    # 5. Target is the velocity field: v = x_1 - x_0
                     target = noise - latents
                 else:
                     # Standard diffusion
