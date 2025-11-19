@@ -348,6 +348,10 @@ class TrainingConfig:
         # 4) Set VAE shift factor (for Flux/RF models)
         if not hasattr(self, 'VAE_SHIFT_FACTOR'):
             self.VAE_SHIFT_FACTOR = 0.0
+        
+        # 5) SDXL VAE scaling
+        if not hasattr(self, 'VAE_SCALING_FACTOR'):
+            self.VAE_SCALING_FACTOR = 0.13025
 
     def _load_user_json(self):
         import argparse
@@ -573,8 +577,8 @@ def precompute_and_cache_latents(config: TrainingConfig, t1, t2, te1, te2, vae, 
                     latents = latents - config.VAE_SHIFT_FACTOR
 
                 # Force SDXL scaling
-                # latents = latents * vae.config.scaling_factor 
-                latents = latents * 0.13025
+                vae_scale = getattr(vae.config, 'scaling_factor', 0.13025)
+                latents = latents * vae_scale
                 
             # 3. Save
             torch.save(
@@ -1245,7 +1249,7 @@ def main():
     print(f"Scheduler: {type(noise_scheduler).__name__}")
     print(f"Prediction type: {config.PREDICTION_TYPE}")
     print(f"Flow matching: {is_flow_matching}")
-    print(f"VAE scaling: {getattr(getattr(config, 'vae_scale_factor', None), '__float__', lambda: 'N/A')()}")
+    print(f"VAE scaling: {config.VAE_SCALING_FACTOR}")
     print(f"VAE shift: {config.VAE_SHIFT_FACTOR}")
     print(f"Timestep sampling: {timestep_sampler.method}")
     print(f"Num train timesteps: {noise_scheduler.config.num_train_timesteps}")

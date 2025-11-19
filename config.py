@@ -2,6 +2,7 @@
 SINGLE_FILE_CHECKPOINT_PATH = "./model.safetensors"
 VAE_PATH = ""  # Optional separate VAE path, leave empty to use VAE from model
 VAE_SHIFT_FACTOR = 0.0  # Latent shift before scaling (0.0 for SDXL, non-zero for some RF models)
+VAE_SCALING_FACTOR = 0.13025
 USE_REFLECTION_PADDING = False  # Enable for EQ-VAE or better edge quality
 OUTPUT_DIR = "./output"
 
