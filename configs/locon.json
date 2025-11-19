@@ -1,6 +1,7 @@
 {
     "SINGLE_FILE_CHECKPOINT_PATH": "saeri_v1.safetensors",
     "VAE_PATH": "",
+    "VAE_SHIFT_FACTOR": 0.0,
     "USE_REFLECTION_PADDING": false,
     "OUTPUT_DIR": "loras",
     "RESUME_MODEL_PATH": "",
@@ -20,8 +21,6 @@
     "MIXED_PRECISION": "bfloat16",
     "CLIP_GRAD_NORM": 1.0,
     "SEED": 333,
-    "FLOW_MATCHING_SIGMA_MIN": 0.002,
-    "FLOW_MATCHING_SIGMA_MAX": 80.0,
     "FLOW_MATCHING_SHIFT": 1.0,
     "SAVE_EVERY_N_STEPS": 100,
     "UNET_EXCLUDE_TARGETS": "conv1, conv2, conv_in, conv_out",
