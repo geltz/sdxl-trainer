@@ -45,6 +45,63 @@ from optimizer.locon import inject_locon_peft, extract_locon_state_dict_comfy_pe
 
 from safetensors.torch import save_file as save_safetensors
 
+class CachingDataset(Dataset):
+    def __init__(self, file_paths, config):
+        self.file_paths = file_paths
+        self.config = config
+        # Re-instantiate calculator here to ensure it's safe for workers
+        self.calc = ResolutionCalculator(
+            config.TARGET_PIXEL_AREA, 
+            64, 
+            config.SHOULD_UPSCALE, 
+            getattr(config, "MAX_AREA_TOLERANCE", 1.1)
+        )
+        self.transform = transforms.Compose([
+            transforms.ToTensor(), 
+            transforms.Normalize([0.5], [0.5])
+        ])
+
+    def __len__(self):
+        return len(self.file_paths)
+
+    def __getitem__(self, idx):
+        path = self.file_paths[idx]
+        try:
+            with Image.open(path) as im:
+                im = im.convert("RGB")
+                w, h = im.size
+                
+            tw, th = self.calc.calculate_resolution(w, h)
+            im = resize_to_fit(im, tw, th)
+            img_tensor = self.transform(im)
+            
+            cp = path.with_suffix(".txt")
+            if cp.exists():
+                caption = cp.read_text(encoding="utf-8").strip() or path.stem.replace("_", " ")
+            else:
+                caption = path.stem.replace("_", " ")
+            
+            # Tag dropout logic
+            whitelist_str = getattr(self.config, "TAG_DROPOUT_WHITELIST", "")
+            whitelist = [tag.strip() for tag in whitelist_str.split(',') if tag.strip()]
+            dropout_rate = getattr(self.config, "TAG_DROPOUT_RATE", 0.0)
+            caption = apply_tag_dropout(caption, dropout_rate, whitelist, log_samples=False)
+
+            return {
+                "img_tensor": img_tensor,
+                "caption": caption,
+                "original_size": (w, h),
+                "target_size": (tw, th),
+                "path": str(path),
+                "stem": path.stem
+            }
+        except Exception as e:
+            print(f"Error loading {path}: {e}")
+            return None
+
+def caching_collate(batch):
+    return [b for b in batch if b is not None]
+
 
 def convert_lora_pt_to_safetensors(pt_path):
     """Convert LoRA .pt to .safetensors immediately after saving."""
@@ -436,7 +493,7 @@ def load_vae_only(config: TrainingConfig, device):
         return None
     print(f"INFO: Loading dedicated VAE from {vae_path}")
     vae = AutoencoderKL.from_single_file(vae_path, torch_dtype=torch.float32).to(device)
-    vae.enable_tiling()
+    # vae.enable_tiling() # no tiling
     return vae
 
 
@@ -454,79 +511,87 @@ def compute_chunked_text_embeddings(captions, t1, t2, te1, te2, device):
         pooled_embeds.append(pooled)
     return torch.cat(prompt_embeds), torch.cat(pooled_embeds)
 
-
 def precompute_and_cache_latents(config: TrainingConfig, t1, t2, te1, te2, vae, device):
-    calc = ResolutionCalculator(
-        config.TARGET_PIXEL_AREA, 64, config.SHOULD_UPSCALE, getattr(config, "MAX_AREA_TOLERANCE", 1.1)
-    )
-    transform = transforms.Compose([transforms.ToTensor(), transforms.Normalize([0.5], [0.5])])
+    # FIX: Enable tiling. This cuts VRAM usage drastically (required for 12GB cards)
+    vae.enable_tiling()
+    
+    # Ensure models are in eval mode
+    vae.eval()
+    te1.eval()
+    te2.eval()
 
     for ds in config.INSTANCE_DATASETS:
         root = Path(ds["path"])
+        if not root.exists(): continue
+        
         img_paths = [p for ext in [".jpg", ".jpeg", ".png", ".webp", ".bmp"] for p in root.rglob(f"*{ext}")]
         cache_dir = root / ".precomputed_embeddings_cache"
         cache_dir.mkdir(exist_ok=True)
+        
         cached = {p.stem for p in cache_dir.glob("*.pt")}
         todo = [p for p in img_paths if p.stem not in cached]
+        
         if not todo:
             print(f"INFO: All images in {root} cached.")
             continue
+        
         print(f"INFO: Caching {len(todo)} images from {root}")
 
-        # load text encoders to device once per dataset
+        # Move Text Encoders to GPU (needed for embedding generation)
         te1.to(device)
         te2.to(device)
 
-        for ip in tqdm(todo, desc=f"Caching {root}"):
-            with Image.open(ip) as im:
-                im = im.convert("RGB")
-                w, h = im.size
-            tw, th = calc.calculate_resolution(w, h)
-            im = resize_to_fit(im, tw, th)
-            img_tensor = transform(im).unsqueeze(0).to(device, dtype=torch.float32)
+        # Use the CachingDataset defined in global scope
+        # num_workers=4 allows resizing images on CPU while GPU works
+        cache_ds = CachingDataset(todo, config)
+        loader = DataLoader(
+            cache_ds, 
+            batch_size=1, 
+            shuffle=False, 
+            num_workers=4, 
+            collate_fn=caching_collate,
+            persistent_workers=True
+        )
 
-            cp = ip.with_suffix(".txt")
-            if cp.exists():
-                caption = cp.read_text(encoding="utf-8").strip() or ip.stem.replace("_", " ")
-            else:
-                caption = ip.stem.replace("_", " ")
-
-            # Apply tag dropout during caching
-            whitelist = [w.strip() for w in config.TAG_DROPOUT_WHITELIST.split(',') if w.strip()]
-            caption = apply_tag_dropout(caption, config.TAG_DROPOUT_RATE, whitelist, log_samples=True)
-
+        for batch in tqdm(loader, desc=f"Caching {root}"):
+            if not batch: continue
+            
+            data = batch[0]
+            
+            img_tensor = data["img_tensor"].unsqueeze(0).to(device, dtype=torch.float32)
+            caption = data["caption"]
+            
+            # 1. Compute Text Embeddings
             embeds, pooled = compute_chunked_text_embeddings([caption], t1, t2, te1, te2, device)
             
+            # 2. Compute Latents with Tiling (Prevents OOM)
             with torch.no_grad():
+                # diffusers automatically handles slicing when enable_tiling() is on
                 latents = vae.encode(img_tensor).latent_dist.mean
                 
-                # Apply VAE shift before scaling (for RF models)
                 if config.VAE_SHIFT_FACTOR != 0.0:
                     latents = latents - config.VAE_SHIFT_FACTOR
-                    print(f"Applied VAE shift: {config.VAE_SHIFT_FACTOR}")  # ADD THIS
                 
                 latents = latents * vae.config.scaling_factor
-                print(f"Latent stats: min={latents.min():.3f}, max={latents.max():.3f}, mean={latents.mean():.3f}")  # ADD THIS
 
+            # 3. Save
             torch.save(
                 {
-                    "original_size": (w, h),
-                    "target_size": (tw, th),
+                    "original_size": data["original_size"],
+                    "target_size": data["target_size"],
                     "embeds": embeds.squeeze(0).cpu(),
                     "pooled": pooled.squeeze(0).cpu(),
                     "latents": latents.squeeze(0).cpu(),
                 },
-                cache_dir / f"{ip.stem}.pt",
+                cache_dir / f"{data['stem']}.pt",
             )
 
-        te1.cpu(); te2.cpu(); gc.collect(); torch.cuda.empty_cache()
-        
-        # Log tag dropout summary
-        if config.TAG_DROPOUT_RATE > 0:
-            print(f"\nTag Dropout Summary for {root}:")
-            print(f"  Dropout rate: {config.TAG_DROPOUT_RATE * 100:.0f}%")
-            print(f"  Whitelist: {config.TAG_DROPOUT_WHITELIST or 'none'}")
-            print(f"  Cached {len(todo)} captions with dropout applied")
+        # Cleanup after this dataset is done
+        te1.cpu(); te2.cpu()
+        del loader
+        del cache_ds
+        gc.collect()
+        torch.cuda.empty_cache()
 
 
 class ImageTextLatentDataset(Dataset):
