@@ -568,12 +568,14 @@ def precompute_and_cache_latents(config: TrainingConfig, t1, t2, te1, te2, vae, 
             with torch.no_grad():
                 # diffusers automatically handles slicing when enable_tiling() is on
                 latents = vae.encode(img_tensor).latent_dist.mean
-                
+
                 if config.VAE_SHIFT_FACTOR != 0.0:
                     latents = latents - config.VAE_SHIFT_FACTOR
-                
-                latents = latents * vae.config.scaling_factor
 
+                # Force SDXL scaling
+                # latents = latents * vae.config.scaling_factor 
+                latents = latents * 0.13025
+                
             # 3. Save
             torch.save(
                 {
