@@ -1015,7 +1015,7 @@ def main():
     
     if is_flow_matching:
         # FlowMatch-specific settings
-        train_sched_cfg["shift"] = getattr(config, "FLOW_MATCHING_SHIFT", 1.0)
+        train_sched_cfg["shift"] = getattr(config, "FLOW_MATCHING_SHIFT", 3.0)
         train_sched_cfg["num_train_timesteps"] = 1000
         # Remove incompatible standard diffusion keys
         for key in ["prediction_type", "beta_schedule", "beta_start", "beta_end", "trained_betas"]:
@@ -1229,8 +1229,8 @@ def main():
                     # 1. Normalize t to [0, 1]
                     t = timesteps.float() / (noise_scheduler.config.num_train_timesteps - 1)
                     
-                    # 2. Retrieve Shift value (Default to 1.0 if not set, SD3/Flux use 3.0)
-                    shift_val = getattr(config, "FLOW_MATCHING_SHIFT", 1.0)
+                    # 2. Retrieve Shift value (SD3/Flux use 3.0)
+                    shift_val = getattr(config, "FLOW_MATCHING_SHIFT", 3.0)
                     
                     # 3. Apply Time-Shifting Math
                     # Formula: t_shifted = (t * shift) / (1 + (shift - 1) * t)
