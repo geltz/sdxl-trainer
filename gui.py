@@ -1201,8 +1201,6 @@ class TrainingGUI(QtWidgets.QWidget):
         "SHOULD_UPSCALE": {"label": "Upscale Images", "tooltip": "If enabled, upscale small images closer to bucket limit while maintaining aspect ratio.", "widget": "QCheckBox"},
         "MAX_AREA_Tolerance": {"label": "Max Area Tolerance:", "tooltip": "When upscaling, allow up to this multiplier over target area (e.g., 1.1 = 10% over).", "widget": "QLineEdit"},
         "PREDICTION_TYPE": {"label": "Prediction Type:", "tooltip": "v_prediction, epsilon, or flow_matching. Must match the base model training method.", "widget": "QComboBox", "options": ["v_prediction", "epsilon", "flow_matching"]},
-        "FLOW_MATCHING_SIGMA_MIN": {"label": "Flow σ Min:", "tooltip": "Minimum noise scale for flow matching (typically 0.002).", "widget": "QLineEdit"},
-        "FLOW_MATCHING_SIGMA_MAX": {"label": "Flow σ Max:", "tooltip": "Maximum noise scale for flow matching (typically 80.0).", "widget": "QLineEdit"},
         "FLOW_MATCHING_SHIFT": {"label": "Flow Shift:", "tooltip": "Timestep shift for flow matching (1.0 for SDXL, 3.0 for SD3).", "widget": "QLineEdit"},
         "BETA_SCHEDULE": {"label": "Beta Schedule:", "tooltip": "Noise schedule for the diffuser.", "widget": "QComboBox", "options": ["scaled_linear", "linear", "squared", "squaredcos_cap_v2"]},
         "MAX_TRAIN_STEPS": {"label": "Max Training Steps:", "tooltip": "Total number of training steps.", "widget": "QLineEdit"},
@@ -1693,8 +1691,6 @@ class TrainingGUI(QtWidgets.QWidget):
         layout = QtWidgets.QFormLayout(core_group)
         core_keys = [
             "PREDICTION_TYPE",
-            "FLOW_MATCHING_SIGMA_MIN",
-            "FLOW_MATCHING_SIGMA_MAX",
             "FLOW_MATCHING_SHIFT",
             "BETA_SCHEDULE", 
             "MAX_TRAIN_STEPS",
@@ -1725,7 +1721,7 @@ class TrainingGUI(QtWidgets.QWidget):
         is_flow = self.widgets["PREDICTION_TYPE"].currentText() == "flow_matching"
         
         # Store references to widgets and their labels
-        flow_keys = ["FLOW_MATCHING_SIGMA_MIN", "FLOW_MATCHING_SIGMA_MAX", "FLOW_MATCHING_SHIFT"]
+        flow_keys = ["FLOW_MATCHING_SHIFT"]
         beta_keys = ["BETA_SCHEDULE"]
         
         # Toggle flow matching params

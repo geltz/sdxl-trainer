@@ -39,8 +39,6 @@ CLIP_GRAD_NORM = 1.0
 SEED = 42
 
 # --- Flow Matching Parameters ---
-FLOW_MATCHING_SIGMA_MIN = 0.002
-FLOW_MATCHING_SIGMA_MAX = 80.0
 FLOW_MATCHING_SHIFT = 1.0  # Standard shift for SDXL flow matching
 
 # --- Saving ---
