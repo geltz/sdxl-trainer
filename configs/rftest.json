@@ -60,7 +60,7 @@
     "TIMESTEP_SAMPLING_GRAD_MIN": 0.5,
     "TIMESTEP_SAMPLING_GRAD_MAX": 2.0,
     "USE_LOG_SNR": false,
-    "TIMESTEP_SAMPLING_METHOD": "Uniform Continuous",
+    "TIMESTEP_SAMPLING_METHOD": "Logit Normal",
     "LOGIT_NORMAL_MEAN": 0.0,
     "LOGIT_NORMAL_STD": 1.0,
     "USE_LORA": false,
