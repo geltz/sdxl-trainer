@@ -148,9 +148,6 @@ def normalize_model_path(pathlike):
     return str(p.resolve())
 
 def apply_tag_dropout(caption: str, dropout_rate: float, whitelist: list, log_samples: bool = True) -> str:
-    """Randomly drop tags from comma-separated caption, preserving whitelisted tags.
-    Whitelist supports wildcards: *girl* matches '1girl', '2girls', etc.
-    """
     if dropout_rate <= 0 or not caption:
         return caption
     
@@ -159,39 +156,29 @@ def apply_tag_dropout(caption: str, dropout_rate: float, whitelist: list, log_sa
         return caption
     
     def matches_whitelist(tag: str, whitelist: list) -> bool:
-        """Check if tag matches any whitelist pattern (supports * wildcard)."""
         tag_lower = tag.lower()
         for pattern in whitelist:
             pattern_lower = pattern.lower()
-            
             if '*' in pattern_lower:
-                import re
                 regex_pattern = '^' + pattern_lower.replace('*', '.*') + '$'
                 if re.match(regex_pattern, tag_lower):
                     return True
             elif tag_lower == pattern_lower:
                 return True
-        
         return False
     
     kept_tags = []
-    droppable_tags = []
-    whitelisted_tags = []
+    dropped = []
     
     for tag in tags:
+        # If whitelisted, always keep
         if matches_whitelist(tag, whitelist):
             kept_tags.append(tag)
-            whitelisted_tags.append(tag)
+        # Otherwise, apply dropout randomly
+        elif random.random() > dropout_rate:
+            kept_tags.append(tag)
         else:
-            droppable_tags.append(tag)
-    
-    # Apply dropout to non-whitelisted tags
-    dropped = []
-    for t in droppable_tags:
-        if random.random() > dropout_rate:
-            kept_tags.append(t)
-        else:
-            dropped.append(t)
+            dropped.append(tag)
     
     # Ensure at least one tag remains
     if not kept_tags:
@@ -199,13 +186,11 @@ def apply_tag_dropout(caption: str, dropout_rate: float, whitelist: list, log_sa
     
     result = ', '.join(kept_tags)
     
-    # Log first 5 samples to verify behavior
     if log_samples and hasattr(apply_tag_dropout, '_sample_count'):
         apply_tag_dropout._sample_count += 1
         if apply_tag_dropout._sample_count <= 5:
             print(f"\n[Tag Dropout Sample #{apply_tag_dropout._sample_count}]")
             print(f"  Original: {caption}")
-            print(f"  Whitelisted: {whitelisted_tags if whitelisted_tags else 'none'}")
             print(f"  Dropped: {dropped if dropped else 'none'}")
             print(f"  Result: {result}")
     

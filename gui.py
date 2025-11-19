@@ -1270,6 +1270,7 @@ class TrainingGUI(QtWidgets.QWidget):
         "LOCON_ALPHA": {"label": "LoCon Alpha:", "tooltip": "Scaling factor (typically = rank)", "widget": "QSpinBox", "range": (1, 128)},
         "LOCON_DROPOUT": {"label": "LoCon Dropout:", "tooltip": "Dropout rate (0.0-0.5)", "widget": "QDoubleSpinBox", "range": (0.0, 0.5), "step": 0.1},
         "TAG_DROPOUT_WHITELIST": {"label": "Tag Whitelist:", "tooltip": "Comma-separated tags protected from dropout. Supports wildcards: *girl* matches '1girl', '2girls', etc.", "widget": "QLineEdit"},
+        "TAG_DROPOUT_RATE": {"label": "Tag Dropout Rate:", "tooltip": "Probability (0.0-1.0) that non-whitelisted tags are dropped during training.", "widget": "QDoubleSpinBox", "range": (0.0, 1.0), "step": 0.05 },
     }
     def __init__(self):
         super().__init__()
