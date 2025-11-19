@@ -287,6 +287,10 @@ class TrainingConfig:
         self.compute_dtype = (
             torch.bfloat16 if self.MIXED_PRECISION == "bfloat16" else torch.float16
         )
+        
+        # 4) Set VAE shift factor (for Flux/RF models)
+        if not hasattr(self, 'VAE_SHIFT_FACTOR'):
+            self.VAE_SHIFT_FACTOR = 0.0
 
     def _load_user_json(self):
         import argparse
@@ -492,8 +496,17 @@ def precompute_and_cache_latents(config: TrainingConfig, t1, t2, te1, te2, vae, 
             caption = apply_tag_dropout(caption, config.TAG_DROPOUT_RATE, whitelist, log_samples=True)
 
             embeds, pooled = compute_chunked_text_embeddings([caption], t1, t2, te1, te2, device)
+            
             with torch.no_grad():
-                latents = vae.encode(img_tensor).latent_dist.mean * vae.config.scaling_factor
+                latents = vae.encode(img_tensor).latent_dist.mean
+                
+                # Apply VAE shift before scaling (for RF models)
+                if config.VAE_SHIFT_FACTOR != 0.0:
+                    latents = latents - config.VAE_SHIFT_FACTOR
+                    print(f"Applied VAE shift: {config.VAE_SHIFT_FACTOR}")  # ADD THIS
+                
+                latents = latents * vae.config.scaling_factor
+                print(f"Latent stats: min={latents.min():.3f}, max={latents.max():.3f}, mean={latents.mean():.3f}")  # ADD THIS
 
             torch.save(
                 {
@@ -698,10 +711,18 @@ class TimestepSampler:
         self.scheduler = noise_scheduler
         self.device = device
         self.num_train_timesteps = int(self.scheduler.config.num_train_timesteps)
+        
         self.method = getattr(config, "TIMESTEP_SAMPLING_METHOD", "Random Integer")
 
         # Only enable LogSNR logic if the sampling method actually uses it
         self.use_log_snr = getattr(config, "USE_LOG_SNR", False) and ("LogSNR" in self.method)
+        
+        # ADD THIS: Disable LogSNR for flow matching
+        is_flow = getattr(config, "PREDICTION_TYPE", "") == "flow_matching"
+        if is_flow and self.use_log_snr:
+            print("WARNING: LogSNR sampling not recommended for flow matching. Disabling.")
+            self.use_log_snr = False
+        
         self.log_snr_per_t = None
 
         print(f"\n{'=' * 60}")
@@ -912,20 +933,6 @@ def patch_diffusers_single_file():
 
     StableDiffusionXLPipeline.from_single_file = _patched
 
-# flow stuff
-
-def add_flow_matching_noise(latents, noise, timesteps, scheduler):
-    # Get normalized time in [0, 1]
-    t = timesteps.float() / (scheduler.config.num_train_timesteps - 1)
-    
-    # Reshape for broadcasting
-    while len(t.shape) < len(latents.shape):
-        t = t.unsqueeze(-1)
-    
-    # Flow matching: x_t = (1 - t) * x_0 + t * noise
-    noisy_latents = (1.0 - t) * latents + t * noise
-    return noisy_latents
-
 # ==========================
 # Main training entry
 # ==========================
@@ -987,46 +994,43 @@ def main():
     }
     
     sched_name = getattr(config, "NOISE_SCHEDULER", "DDPMScheduler").replace(" (Experimental)", "")
-    
-    # Check prediction type first
     is_flow_matching = config.PREDICTION_TYPE == "flow_matching"
     
-    # Force correct scheduler for flow matching
-    if is_flow_matching and sched_name != "FlowMatchEulerDiscreteScheduler":
-        print(f"WARNING: Flow matching requires FlowMatchEulerDiscreteScheduler. Overriding {sched_name}.")
-        sched_name = "FlowMatchEulerDiscreteScheduler"
-    elif not is_flow_matching and sched_name == "FlowMatchEulerDiscreteScheduler":
-        print(f"WARNING: FlowMatchEulerDiscreteScheduler requires prediction_type='flow_matching'. Switching to DDPMScheduler.")
-        sched_name = "DDPMScheduler"
+    # Validate scheduler/prediction_type compatibility
+    if is_flow_matching:
+        if sched_name != "FlowMatchEulerDiscreteScheduler":
+            print(f"WARNING: Flow matching requires FlowMatchEulerDiscreteScheduler. Overriding {sched_name}.")
+            sched_name = "FlowMatchEulerDiscreteScheduler"
+    else:
+        if sched_name == "FlowMatchEulerDiscreteScheduler":
+            print(f"WARNING: FlowMatchEulerDiscreteScheduler requires flow_matching. Switching to DDPMScheduler.")
+            sched_name = "DDPMScheduler"
     
     sched_cls = SCHED_MAP.get(sched_name)
     if not sched_cls:
-        raise ValueError(f"Unknown scheduler {sched_name}")
+        raise ValueError(f"Unknown scheduler: {sched_name}")
     
-    # Convert FrozenDict to regular dict
+    # Build scheduler config
     train_sched_cfg = dict(orig_sched_cfg)
     
     if is_flow_matching:
-        # Flow matching specific config
+        # FlowMatch-specific settings
         train_sched_cfg["shift"] = getattr(config, "FLOW_MATCHING_SHIFT", 1.0)
         train_sched_cfg["num_train_timesteps"] = 1000
-        # Remove incompatible keys for FlowMatch
-        train_sched_cfg.pop("prediction_type", None)
-        train_sched_cfg.pop("beta_schedule", None)
-        train_sched_cfg.pop("beta_start", None)
-        train_sched_cfg.pop("beta_end", None)
-        train_sched_cfg.pop("trained_betas", None)
-        print(f"INFO: Flow matching enabled with shift={train_sched_cfg['shift']}")
+        # Remove incompatible standard diffusion keys
+        for key in ["prediction_type", "beta_schedule", "beta_start", "beta_end", "trained_betas"]:
+            train_sched_cfg.pop(key, None)
+        print(f"INFO: Flow matching enabled (shift={train_sched_cfg['shift']})")
     else:
         train_sched_cfg["prediction_type"] = config.PREDICTION_TYPE
     
-    # Filter to only valid keys for this scheduler
     train_sched_cfg = filter_scheduler_config(train_sched_cfg, sched_cls)
     noise_scheduler = sched_cls.from_config(train_sched_cfg)
     
-    print(f"INFO: Using scheduler {sched_cls.__name__}")
+    print(f"INFO: Scheduler={sched_cls.__name__}, Prediction={config.PREDICTION_TYPE}")
+    
     if is_flow_matching:
-        print(f"      Flow matching mode active")
+        print(f"      Flow matching.")
     else:
         print(f"      Prediction type: {noise_scheduler.config.prediction_type}")
 
@@ -1148,7 +1152,6 @@ def main():
     use_scaler = is_fp32 and config.MIXED_PRECISION in ["float16", "fp16"]
     scaler = torch.amp.GradScaler("cuda", enabled=use_scaler)
     is_v_pred = config.PREDICTION_TYPE == "v_prediction"
-    is_flow_matching = config.PREDICTION_TYPE == "flow_matching"
 
     if use_lora:
         # For LoRA, watch the first trainable (LoRA) parameter
@@ -1167,9 +1170,25 @@ def main():
     else:
         print("Noise offset disabled")
     print("=" * 40)
+    
+    # VALIDATION BLOCK:
+    print("\n" + "="*60)
+    print("TRAINING CONFIGURATION VALIDATION")
+    print("="*60)
+    print(f"Scheduler: {type(noise_scheduler).__name__}")
+    print(f"Prediction type: {config.PREDICTION_TYPE}")
+    print(f"Flow matching: {is_flow_matching}")
+    print(f"VAE scaling: {getattr(getattr(config, 'vae_scale_factor', None), '__float__', lambda: 'N/A')()}")
+    print(f"VAE shift: {config.VAE_SHIFT_FACTOR}")
+    print(f"Timestep sampling: {timestep_sampler.method}")
+    print(f"Num train timesteps: {noise_scheduler.config.num_train_timesteps}")
+    if is_flow_matching:
+        print(f"Flow shift: {noise_scheduler.config.shift}")
+    print("="*60 + "\n")
 
     # 11) training loop
     unet.train()
+    
     pbar = tqdm(range(global_step, config.MAX_TRAIN_STEPS), desc="Training", total=config.MAX_TRAIN_STEPS, initial=global_step)
     accumulated_paths = []
     done = False
@@ -1207,17 +1226,25 @@ def main():
                 is_flow_matching = config.PREDICTION_TYPE == "flow_matching"
 
                 if is_flow_matching:
-                    # Rectified flow: x_t = (1-t)*x_0 + t*x_1
-                    # Velocity: dx/dt = x_1 - x_0 = noise - latents
+                    # Rectified Flow: interpolate x_t = (1-t)*x_0 + t*x_1
+                    # Target is velocity field: v = x_1 - x_0
                     t = timesteps.float() / (noise_scheduler.config.num_train_timesteps - 1)
-                    while len(t.shape) < len(latents.shape):
-                        t = t.unsqueeze(-1)
                     
-                    noisy_latents = (1.0 - t) * latents + t * noise
-                    target = noise - latents  # Constant velocity vector
+                    # Reshape t for broadcasting
+                    t_expanded = t.view(-1, 1, 1, 1)
+                    
+                    # Linear interpolation
+                    noisy_latents = (1.0 - t_expanded) * latents + t_expanded * noise
+                    
+                    # Target is the velocity (constant for rectified flow)
+                    target = noise - latents
                 else:
+                    # Standard diffusion
                     noisy_latents = noise_scheduler.add_noise(latents, noise, timesteps)
-                    target = noise_scheduler.get_velocity(latents, noise, timesteps) if is_v_pred else noise
+                    if is_v_pred:
+                        target = noise_scheduler.get_velocity(latents, noise, timesteps)
+                    else:
+                        target = noise
 
                 pred = unet(
                     noisy_latents,
