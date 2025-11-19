@@ -2,6 +2,7 @@
     "SINGLE_FILE_CHECKPOINT_PATH": "saeri_v1.safetensors",
     "VAE_PATH": "",
     "VAE_SHIFT_FACTOR": 0.0,
+    "VAE_SCALING_FACTOR": 0.13025,
     "USE_REFLECTION_PADDING": false,
     "OUTPUT_DIR": "loras",
     "RESUME_MODEL_PATH": "",
