@@ -25,25 +25,14 @@
     "SAVE_EVERY_N_STEPS": 100,
     "UNET_EXCLUDE_TARGETS": "conv1, conv2, conv_in, conv_out",
     "LR_CUSTOM_CURVE": [
-        [
-            0.0,
-            1e-06
-        ],
-        [
-            0.15,
-            2e-05
-        ],
-        [
-            0.85,
-            2e-05
-        ],
-        [
-            1.0,
-            5e-07
-        ]
+        [0.0, 1e-07],
+        [0.05, 2e-05],
+        [0.75, 2e-05],
+        [0.90, 5e-06],
+        [1.0, 1e-07]
     ],
     "LR_GRAPH_MIN": 0.0,
-    "LR_GRAPH_MAX": 1e-06,
+    "LR_GRAPH_MAX": 3e-05,
     "MEMORY_EFFICIENT_ATTENTION": "sdpa",
     "USE_ZERO_TERMINAL_SNR": false,
     "GRAD_SPIKE_THRESHOLD_HIGH": 20.0,
