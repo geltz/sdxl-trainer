@@ -13,9 +13,9 @@ Features:
 Additional features:  
 
 - Train LoRAs and LoCons    
-- Tag caption dropout with wildcards    
+- Tag caption dropout with wildcards
+- Flow matching scheduler  
 - More timestep sampling choices
-- Flow matching with FlowMatchEulerDiscrete scheduler  
 - Optimizer state offload frequency
 - Reflection padding for EQ-VAE
 - Improved GUI with neutral light theme
