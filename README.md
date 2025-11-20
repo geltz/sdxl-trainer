@@ -11,7 +11,8 @@ Features:
 - Resume state from a training checkpoint   
 - UNet layer exclusion via keyword filter
 - Live statistics for learning rate, gradient norms and loss
-- AdamW (Raven) that offloads to CPU for less VRAM    
+- AdamW (Raven) that offloads to CPU for less VRAM
+- Gradient centralization    
 - Train LoRAs and LoCons    
 - Tag caption dropout with wildcards
 - Flow matching scheduler  
