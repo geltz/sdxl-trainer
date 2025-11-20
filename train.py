@@ -565,6 +565,8 @@ def precompute_and_cache_latents(config: TrainingConfig, t1, t2, te1, te2, vae, 
                 vae_scale = getattr(vae.config, 'scaling_factor', 0.13025)
                 latents = latents * vae_scale
                 
+                latents = batch["latents"].to(device) * config.VAE_SCALING_FACTOR
+                
             # 3. Save
             torch.save(
                 {
@@ -1276,28 +1278,37 @@ def main():
                 else:
                     noise = torch.randn_like(latents)
 
-                timesteps = timestep_sampler.sample(latents.shape[0])
-                timestep_sampler.record_timesteps(timesteps)
+                # Logit normal should sample in [0, 1] space for flow matching
+                if "Logit Normal" in self.method and is_flow_matching:
+                    # Sample in continuous space
+                    z = torch.randn(...) * std + mean
+                    t_continuous = torch.sigmoid(z)  # [0, 1]
+                    # Convert to discrete for scheduler if needed
+                    timesteps = (t_continuous * (num_train_timesteps - 1)).long()
+                else:
+                    # Standard discrete sampling
+                    timesteps = torch.randint(...)
 
                 is_flow_matching = config.PREDICTION_TYPE == "flow_matching"
 
                 if is_flow_matching:
-                    # 1. normalize t to [0, 1]
-                    t = timesteps.float() / (noise_scheduler.config.num_train_timesteps - 1)
+                    # t should remain as discrete timestep indices, not normalized
+                    t_continuous = timesteps.float() / (noise_scheduler.config.num_train_timesteps - 1)
                     
-                    # 2. retrieve shift value
-                    shift_val = getattr(config, "FLOW_MATCHING_SHIFT", 2.5)
-                    
-                    # 3. apply time-shifting math
+                    # Shift if needed (SD3-style)
                     if shift_val != 1.0:
-                        t = (t * shift_val) / (1 + (shift_val - 1) * t)
-
-                    # 4. efficient interpolation: x_t = lerp(x_0, x_1, t)
-                    t_expanded = t.view(-1, 1, 1, 1)
-                    noisy_latents = torch.lerp(latents, noise, t_expanded)
+                        t_continuous = shift(t_continuous, shift_val)
                     
-                    # 5. target is the velocity field: v = x_1 - x_0
+                    # Lerp in latent space
+                    t_expanded = t_continuous.view(-1, 1, 1, 1)
+                    noisy_latents = (1 - t_expanded) * latents + t_expanded * noise
+                    
+                    # Velocity target: v = x_1 - x_0 (already correct)
                     target = noise - latents
+                    
+                    # Predict velocity, not noise
+                    pred_velocity = pred  # unet output
+                    loss = F.mse_loss(pred_velocity.float(), target.float())
                     
                 else:
                     # Standard diffusion
