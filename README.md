@@ -1,4 +1,4 @@
-UNet trainer for SDXL models. Modified from [Aozora](https://github.com/Hysocs/Aozora_SDXL_Training).   
+UNet trainer for SDXL models. PyQt6 GUI and CLI wrapper. Modified from [Aozora](https://github.com/Hysocs/Aozora_SDXL_Training).   
 
 Hardware requirements:
 
