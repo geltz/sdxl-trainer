@@ -1262,6 +1262,12 @@ def main():
             embeds = batch["embeds"].to(device, non_blocking=True)
             pooled = batch["pooled"].to(device, non_blocking=True)
 
+            # Generate noise OUTSIDE autocast to avoid fp16 precision issues
+            if getattr(config, "USE_NOISE_OFFSET", False):
+                noise = generate_offset_noise(latents, config)
+            else:
+                noise = torch.randn_like(latents)
+
             with torch.autocast(device_type=device.type, dtype=config.compute_dtype, enabled=True):
                 time_ids = torch.cat(
                     [
@@ -1270,11 +1276,6 @@ def main():
                     ],
                     dim=0,
                 ).to(device, dtype=embeds.dtype)
-
-                if getattr(config, "USE_NOISE_OFFSET", False):
-                    noise = generate_offset_noise(latents, config)
-                else:
-                    noise = torch.randn_like(latents)
 
                 timesteps = timestep_sampler.sample(latents.shape[0])
                 timestep_sampler.record_timesteps(timesteps)
@@ -1289,7 +1290,6 @@ def main():
                     shift_val = getattr(config, "FLOW_MATCHING_SHIFT", 3.0)
                     
                     # 3. Apply Time-Shifting Math
-                    # Formula: t_shifted = (t * shift) / (1 + (shift - 1) * t)
                     if shift_val != 1.0:
                         t = (t * shift_val) / (1 + (shift_val - 1) * t)
 
@@ -1299,6 +1299,7 @@ def main():
                     
                     # 5. Target is the velocity field: v = x_1 - x_0
                     target = noise - latents
+                    
                 else:
                     # Standard diffusion
                     noisy_latents = noise_scheduler.add_noise(latents, noise, timesteps)
@@ -1315,6 +1316,11 @@ def main():
                 ).sample
 
                 loss = F.mse_loss(pred.float(), target.float(), reduction="mean")
+
+            # Explicit cleanup of large intermediates after loss computation
+            del noisy_latents, target, noise
+            if is_flow_matching:
+                del t, t_expanded
 
             diagnostics.step(loss.item())
             scaler.scale(loss / config.GRADIENT_ACCUMULATION_STEPS).backward()
@@ -1353,7 +1359,6 @@ def main():
                     for pth in accumulated_paths:
                         tqdm.write(f"  - {Path(pth).stem}")
                     tqdm.write("===============================\n")
-
 
                 scaler.step(optimizer)
                 scaler.update()
