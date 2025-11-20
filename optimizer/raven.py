@@ -7,13 +7,13 @@ class RavenAdamW(Optimizer):
         self,
         params,
         lr: float = 1e-6,
-        betas: tuple[float, float] = (0.9, 0.999),
+        betas: tuple[float, float] = (0.9, 0.99),
         weight_decay: float = 0.01,
         eps: float = 1e-8,
         debias_strength: float = 1.0,
         use_grad_centralization: bool = False,
         gc_alpha: float = 1.0,
-        offload_frequency: int = 1,  # NEW: offload every N steps
+        offload_frequency: int = 1,  # offload every N steps
     ):
         if not 0.0 <= lr: 
             raise ValueError(f"Invalid learning rate: {lr}")
@@ -204,4 +204,5 @@ class RavenAdamW(Optimizer):
             
         state_dict['param_device'] = str(self.param_device)
         state_dict['global_step_counter'] = self.global_step_counter
+
         return state_dict
