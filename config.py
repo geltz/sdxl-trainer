@@ -32,7 +32,7 @@ NOISE_SCHEDULER = "DDPMScheduler"  # Options: "DDPMScheduler", "DDIMScheduler", 
 PREDICTION_TYPE = "v_prediction"  # Options: "v_prediction", "epsilon", "flow_matching"
 BETA_SCHEDULE = "scaled_linear"
 MAX_TRAIN_STEPS = 6000
-LEARNING_RATE = 2e-6 # keep it safe like 3e-6
+LEARNING_RATE = 3e-5
 BATCH_SIZE = 1
 GRADIENT_ACCUMULATION_STEPS = 4
 MIXED_PRECISION = "float16"
@@ -128,4 +128,5 @@ LOCON_TARGET_MODULES = None
 TAG_DROPOUT_RATE = 0.1  # 10% chance to drop each tag
 
 TAG_DROPOUT_WHITELIST = "*girl*, *boy*, solo, masterpiece"  # Supports wildcards with *
+
 
