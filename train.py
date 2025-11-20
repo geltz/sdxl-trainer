@@ -501,17 +501,16 @@ def compute_chunked_text_embeddings(captions, t1, t2, te1, te2, device):
     return torch.cat(prompt_embeds), torch.cat(pooled_embeds)
 
 def precompute_and_cache_latents(config: TrainingConfig, t1, t2, te1, te2, vae, device):
-    # FIX: Enable tiling. This cuts VRAM usage drastically (required for 12GB cards)
+    """Precompute and cache text embeddings + latents for all dataset images."""
     vae.enable_tiling()
-    
-    # Ensure models are in eval mode
     vae.eval()
     te1.eval()
     te2.eval()
 
     for ds in config.INSTANCE_DATASETS:
         root = Path(ds["path"])
-        if not root.exists(): continue
+        if not root.exists():
+            continue
         
         img_paths = [p for ext in [".jpg", ".jpeg", ".png", ".webp", ".bmp"] for p in root.rglob(f"*{ext}")]
         cache_dir = root / ".precomputed_embeddings_cache"
@@ -526,12 +525,9 @@ def precompute_and_cache_latents(config: TrainingConfig, t1, t2, te1, te2, vae, 
         
         print(f"INFO: Caching {len(todo)} images from {root}")
 
-        # Move Text Encoders to GPU (needed for embedding generation)
         te1.to(device)
         te2.to(device)
 
-        # Use the CachingDataset defined in global scope
-        # num_workers=4 allows resizing images on CPU while GPU works
         cache_ds = CachingDataset(todo, config)
         loader = DataLoader(
             cache_ds, 
@@ -543,31 +539,29 @@ def precompute_and_cache_latents(config: TrainingConfig, t1, t2, te1, te2, vae, 
         )
 
         for batch in tqdm(loader, desc=f"Caching {root}"):
-            if not batch: continue
+            if not batch:
+                continue
             
             data = batch[0]
-            
             img_tensor = data["img_tensor"].unsqueeze(0).to(device, dtype=torch.float32)
             caption = data["caption"]
             
             # 1. Compute Text Embeddings
             embeds, pooled = compute_chunked_text_embeddings([caption], t1, t2, te1, te2, device)
             
-            # 2. Compute Latents with Tiling (Prevents OOM)
+            # 2. Compute Latents
             with torch.no_grad():
-                # diffusers automatically handles slicing when enable_tiling() is on
                 latents = vae.encode(img_tensor).latent_dist.mean
-
+                
+                # Apply VAE shift if configured
                 if config.VAE_SHIFT_FACTOR != 0.0:
                     latents = latents - config.VAE_SHIFT_FACTOR
-
-                # Force SDXL scaling
+                
+                # Apply VAE scaling (SDXL standard is 0.13025)
                 vae_scale = getattr(vae.config, 'scaling_factor', 0.13025)
                 latents = latents * vae_scale
-                
-                latents = batch["latents"].to(device) * config.VAE_SCALING_FACTOR
-                
-            # 3. Save
+            
+            # 3. Save to cache
             torch.save(
                 {
                     "original_size": data["original_size"],
@@ -579,8 +573,9 @@ def precompute_and_cache_latents(config: TrainingConfig, t1, t2, te1, te2, vae, 
                 cache_dir / f"{data['stem']}.pt",
             )
 
-        # Cleanup after this dataset is done
-        te1.cpu(); te2.cpu()
+        # Cleanup
+        te1.cpu()
+        te2.cpu()
         del loader
         del cache_ds
         gc.collect()
@@ -1274,50 +1269,40 @@ def main():
                 ).to(device, dtype=embeds.dtype)
 
                 if getattr(config, "USE_NOISE_OFFSET", False):
-                    noise = generate_offset_noise(latents, config)
+                    noise = torch.randn_like(latents)  # TODO: implement generate_offset_noise()
                 else:
                     noise = torch.randn_like(latents)
 
-                # Logit normal should sample in [0, 1] space for flow matching
-                if "Logit Normal" in self.method and is_flow_matching:
-                    # Sample in continuous space
-                    z = torch.randn(...) * std + mean
-                    t_continuous = torch.sigmoid(z)  # [0, 1]
-                    # Convert to discrete for scheduler if needed
-                    timesteps = (t_continuous * (num_train_timesteps - 1)).long()
-                else:
-                    # Standard discrete sampling
-                    timesteps = torch.randint(...)
+                # Sample timesteps using configured method
+                timesteps = timestep_sampler.sample(latents.shape[0])
+                timestep_sampler.record_timesteps(timesteps)
 
                 is_flow_matching = config.PREDICTION_TYPE == "flow_matching"
 
                 if is_flow_matching:
-                    # t should remain as discrete timestep indices, not normalized
+                    # Normalize timesteps to [0, 1]
                     t_continuous = timesteps.float() / (noise_scheduler.config.num_train_timesteps - 1)
                     
-                    # Shift if needed (SD3-style)
+                    # Apply shift if configured (SD3-style)
+                    shift_val = getattr(config, "FLOW_MATCHING_SHIFT", 1.0)
                     if shift_val != 1.0:
-                        t_continuous = shift(t_continuous, shift_val)
+                        t_continuous = (t_continuous * shift_val) / (1 + (shift_val - 1) * t_continuous)
                     
-                    # Lerp in latent space
+                    # Lerp in latent space: x_t = (1-t)*x_0 + t*x_1
                     t_expanded = t_continuous.view(-1, 1, 1, 1)
                     noisy_latents = (1 - t_expanded) * latents + t_expanded * noise
                     
-                    # Velocity target: v = x_1 - x_0 (already correct)
+                    # Target is velocity: v = x_1 - x_0 = noise - latents
                     target = noise - latents
-                    
-                    # Predict velocity, not noise
-                    pred_velocity = pred  # unet output
-                    loss = F.mse_loss(pred_velocity.float(), target.float())
-                    
                 else:
-                    # Standard diffusion
+                    # Standard diffusion path
                     noisy_latents = noise_scheduler.add_noise(latents, noise, timesteps)
                     if is_v_pred:
                         target = noise_scheduler.get_velocity(latents, noise, timesteps)
                     else:
                         target = noise
 
+                # Forward pass
                 pred = unet(
                     noisy_latents,
                     timesteps,
@@ -1325,6 +1310,7 @@ def main():
                     added_cond_kwargs={"text_embeds": pooled, "time_ids": time_ids},
                 ).sample
 
+                # Loss is always MSE between prediction and target
                 loss = F.mse_loss(pred.float(), target.float(), reduction="mean")
 
             diagnostics.step(loss.item())
