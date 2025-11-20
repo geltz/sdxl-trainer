@@ -696,7 +696,6 @@ class CustomCurveLRScheduler:
         self.current_training_step = training_step
         self._update_lr()
 
-
 class TrainingDiagnostics:
     def __init__(self, accumulation_steps: int, test_param_name: str):
         self.accum = accumulation_steps
@@ -711,15 +710,23 @@ class TrainingDiagnostics:
             return
         avg_loss = sum(self.losses) / len(self.losses)
         lr = optimizer.param_groups[0]["lr"]
-        upd = torch.abs(after_val - before_val).max().item()
+        
+        # Calculate parameter update magnitude
+        if before_val is not None and after_val is not None:
+            upd = torch.abs(after_val - before_val).max().item()
+        else:
+            upd = 0.0
+
         reserved = torch.cuda.memory_reserved() / 1e9 if torch.cuda.is_available() else 0.0
         alloc = torch.cuda.memory_allocated() / 1e9 if torch.cuda.is_available() else 0.0
-        tqdm.write(
-            f"\n--- Step {global_step} | Loss {avg_loss:.5f} | LR {lr:.2e} ---\n"
-            f"  Grad (raw/clipped): {raw_grad_norm:.4f} / {clipped_grad_norm:.4f}\n"
-            f"  VRAM: reserved={reserved:.2f}GB allocated={alloc:.2f}GB\n"
-            f"  Param: {self.test_param_name} | update={upd:.3e}"
-        )
+        
+        # Use standard print with flush=True so GUI catches it immediately
+        # The format must match the Regex in gui.py exactly
+        print(f"--- Step {global_step} | Loss {avg_loss:.5f} | LR {lr:.2e} ---", flush=True)
+        
+        # Print secondary info
+        print(f"  Grad: {raw_grad_norm:.4f} / {clipped_grad_norm:.4f} | VRAM: {reserved:.2f}GB", flush=True)
+        
         self.losses.clear()
 
 

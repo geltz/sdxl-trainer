@@ -641,7 +641,7 @@ class LiveMetricsWidget(QtWidgets.QWidget):
         if self.update_timer.isActive():
             self.update_timer.stop()
             self.update_timer.start(self.update_interval_ms)
-    
+
     def parse_and_update(self, text):
         """Parse console output and extract metrics. Batches updates for performance."""
         if self.pause_button.isChecked():
@@ -649,37 +649,44 @@ class LiveMetricsWidget(QtWidgets.QWidget):
         
         data_added = False
         
-        # Parse step report format:
-        # --- Step: {step} | Loss: {loss} | LR: {lr} ---
+        # FIX: More robust regex that handles variable spacing
+        # Matches: --- Step 123 | Loss 0.12345 | LR 1.00e-05 ---
         step_match = re.search(
-            r'---\s*Step\s+(\d+)\s*\|\s*Loss\s+([\d.eE+-]+)\s*\|\s*LR\s+([\d.eE+-]+)\s*---',
+            r'Step\s+(\d+)\s*\|\s*Loss\s+([\d.eE+-]+)\s*\|\s*LR\s+([\d.eE+-]+)',
             text
         )
         if step_match:
-            step = int(step_match.group(1))
-            loss = float(step_match.group(2))
-            lr = float(step_match.group(3))
-            
-            self.pending_data.append(('step', step, loss, lr))
-            self.latest_step = step
-            self.latest_lr = lr
-            self.latest_loss = loss
-            data_added = True
+            try:
+                step = int(step_match.group(1))
+                loss = float(step_match.group(2))
+                lr = float(step_match.group(3))
+                
+                self.pending_data.append(('step', step, loss, lr))
+                self.latest_step = step
+                self.latest_lr = lr
+                self.latest_loss = loss
+                data_added = True
+            except ValueError:
+                pass
         
-        # Parse gradient norm format:
-        # Grad Norm (Raw/Clipped): {raw} / {clipped}
+        # Parse gradient norm format
         grad_match = re.search(
-            r'Grad\s*\(raw/clipped\):\s*([\d.eE+-]+)\s*/\s*([\d.eE+-]+)',
+            r'Grad[:\s]+([\d.eE+-]+)\s*/\s*([\d.eE+-]+)',
             text,
             re.IGNORECASE
         )
         if grad_match:
-            raw_norm = float(grad_match.group(1))
-            clipped_norm = float(grad_match.group(2))
-            
-            self.pending_data.append(('grad', raw_norm, clipped_norm))
-            self.latest_grad = raw_norm
-            data_added = True
+            try:
+                raw_norm = float(grad_match.group(1))
+                clipped_norm = float(grad_match.group(2))
+                
+                # Only update graph if we have a valid step associated
+                if self.latest_step > 0:
+                    self.pending_data.append(('grad', self.latest_step, raw_norm, clipped_norm))
+                    self.latest_grad = raw_norm
+                    data_added = True
+            except ValueError:
+                pass
         
         if data_added:
             self.pending_update = True
