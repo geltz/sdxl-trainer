@@ -15,8 +15,8 @@
     "NOISE_SCHEDULER": "FlowMatchEulerDiscreteScheduler",
     "PREDICTION_TYPE": "flow_matching",
     "BETA_SCHEDULE": "scaled_linear",
-    "MAX_TRAIN_STEPS": 7000,
-    "LEARNING_RATE": 2e-05,
+    "MAX_TRAIN_STEPS": 5000,
+    "LEARNING_RATE": 2e-06,
     "BATCH_SIZE": 1,
     "GRADIENT_ACCUMULATION_STEPS": 16,
     "MIXED_PRECISION": "bfloat16",
@@ -26,29 +26,14 @@
     "SAVE_EVERY_N_STEPS": 100,
     "UNET_EXCLUDE_TARGETS": "conv1, conv2, conv_in, conv_out",
     "LR_CUSTOM_CURVE": [
-        [
-            0.0,
-            1e-07
-        ],
-        [
-            0.05,
-            2e-05
-        ],
-        [
-            0.75,
-            2e-05
-        ],
-        [
-            0.9,
-            5e-06
-        ],
-        [
-            1.0,
-            1e-07
-        ]
+        [0.0, 1e-08],
+        [0.05, 2e-06],
+        [0.60, 2e-06],
+        [0.90, 5e-07],
+        [1.0, 1e-08]
     ],
     "LR_GRAPH_MIN": 0.0,
-    "LR_GRAPH_MAX": 3e-05,
+    "LR_GRAPH_MAX": 3e-06,
     "MEMORY_EFFICIENT_ATTENTION": "sdpa",
     "USE_ZERO_TERMINAL_SNR": false,
     "GRAD_SPIKE_THRESHOLD_HIGH": 20.0,
@@ -89,14 +74,11 @@
     ],
     "OPTIMIZER_TYPE": "raven",
     "RAVEN_PARAMS": {
-        "betas": [
-            0.9,
-            0.999
-        ],
+        "betas": [0.9, 0.99], 
         "eps": 1e-08,
-        "weight_decay": 0.003,
+        "weight_decay": 0.01,
         "debias_strength": 1.0,
-        "use_grad_centralization": false,
+        "use_grad_centralization": true,
         "gc_alpha": 0.5,
         "offload_frequency": 1
     },
