@@ -67,7 +67,7 @@ OPTIMIZER_TYPE = "raven"  # "raven" or "adafactor"
 
 # Raven Optimizer Parameters
 RAVEN_PARAMS = {
-    "betas": [0.9, 0.999],
+    "betas": [0.9, 0.99],
     "eps": 1e-8,
     "weight_decay": 0.01,
     "debias_strength": 0.3,
@@ -128,5 +128,6 @@ LOCON_TARGET_MODULES = None
 TAG_DROPOUT_RATE = 0.1  # 10% chance to drop each tag
 
 TAG_DROPOUT_WHITELIST = "*girl*, *boy*, solo, masterpiece"  # Supports wildcards with *
+
 
 
