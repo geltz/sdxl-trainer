@@ -1282,21 +1282,21 @@ def main():
                 is_flow_matching = config.PREDICTION_TYPE == "flow_matching"
 
                 if is_flow_matching:
-                    # 1. Normalize t to [0, 1]
+                    # 1. normalize t to [0, 1]
                     t = timesteps.float() / (noise_scheduler.config.num_train_timesteps - 1)
                     
-                    # 2. Retrieve Shift value (SD3/Flux use 3.0)
-                    shift_val = getattr(config, "FLOW_MATCHING_SHIFT", 3.0)
+                    # 2. retrieve shift value
+                    shift_val = getattr(config, "FLOW_MATCHING_SHIFT", 2.5)
                     
-                    # 3. Apply Time-Shifting Math
+                    # 3. apply time-shifting math
                     if shift_val != 1.0:
                         t = (t * shift_val) / (1 + (shift_val - 1) * t)
 
-                    # 4. Interpolate x_t = (1-t)*x_0 + t*x_1
+                    # 4. efficient interpolation: x_t = lerp(x_0, x_1, t)
                     t_expanded = t.view(-1, 1, 1, 1)
-                    noisy_latents = (1.0 - t_expanded) * latents + t_expanded * noise
+                    noisy_latents = torch.lerp(latents, noise, t_expanded)
                     
-                    # 5. Target is the velocity field: v = x_1 - x_0
+                    # 5. target is the velocity field: v = x_1 - x_0
                     target = noise - latents
                     
                 else:

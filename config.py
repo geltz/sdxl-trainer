@@ -40,7 +40,7 @@ CLIP_GRAD_NORM = 1.0
 SEED = 42
 
 # --- Flow Matching Parameters ---
-FLOW_MATCHING_SHIFT = 3.0
+FLOW_MATCHING_SHIFT = 2.5
 
 # --- Saving ---
 SAVE_EVERY_N_STEPS = 100
