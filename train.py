@@ -1262,12 +1262,6 @@ def main():
             embeds = batch["embeds"].to(device, non_blocking=True)
             pooled = batch["pooled"].to(device, non_blocking=True)
 
-            # Generate noise OUTSIDE autocast to avoid fp16 precision issues
-            if getattr(config, "USE_NOISE_OFFSET", False):
-                noise = generate_offset_noise(latents, config)
-            else:
-                noise = torch.randn_like(latents)
-
             with torch.autocast(device_type=device.type, dtype=config.compute_dtype, enabled=True):
                 time_ids = torch.cat(
                     [
@@ -1276,6 +1270,12 @@ def main():
                     ],
                     dim=0,
                 ).to(device, dtype=embeds.dtype)
+                
+                # fuck off
+                #if getattr(config, "USE_NOISE_OFFSET", False):
+                #    noise = generate_offset_noise(latents, config)
+                #else:
+                #    noise = torch.randn_like(latents)
 
                 timesteps = timestep_sampler.sample(latents.shape[0])
                 timestep_sampler.record_timesteps(timesteps)
@@ -1316,11 +1316,6 @@ def main():
                 ).sample
 
                 loss = F.mse_loss(pred.float(), target.float(), reduction="mean")
-
-            # Explicit cleanup of large intermediates after loss computation
-            del noisy_latents, target, noise
-            if is_flow_matching:
-                del t, t_expanded
 
             diagnostics.step(loss.item())
             scaler.scale(loss / config.GRADIENT_ACCUMULATION_STEPS).backward()
