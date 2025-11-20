@@ -7,13 +7,13 @@ class RavenAdamW(Optimizer):
         self,
         params,
         lr: float = 1e-6,
-        betas: tuple[float, float] = (0.9, 0.99),
+        betas: tuple[float, float] = (0.9, 0.999),
         weight_decay: float = 0.01,
         eps: float = 1e-8,
         debias_strength: float = 1.0,
         use_grad_centralization: bool = False,
         gc_alpha: float = 1.0,
-        offload_frequency: int = 1,  # offload every N steps
+        offload_frequency: int = 1,  # NEW: offload every N steps
     ):
         if not 0.0 <= lr: 
             raise ValueError(f"Invalid learning rate: {lr}")
@@ -159,14 +159,13 @@ class RavenAdamW(Optimizer):
                     denom = (exp_avg_sq_gpu_view.sqrt() / bias_correction2_sqrt).add_(eps)
                     p.addcdiv_(exp_avg_gpu_view, denom, value=-step_size)
                 
-                # Only offload every N steps
-                if should_offload:
-                    exp_avg_cpu.copy_(exp_avg_gpu_view, non_blocking=True)
-                    exp_avg_sq_cpu.copy_(exp_avg_sq_gpu_view, non_blocking=True)
+                    # ALWAYS sync moments before update
+                    exp_avg_cpu.copy_(exp_avg_gpu_view)  # no non_blocking
+                    exp_avg_sq_cpu.copy_(exp_avg_sq_gpu_view)
 
-        # Only sync when we actually offloaded
-        if should_offload and torch.cuda.is_available(): 
-            torch.cuda.synchronize()
+                    # Only reduce frequency of saving to disk, not computation
+                    if should_offload and torch.cuda.is_available():
+                        torch.cuda.synchronize()
 
         return loss
 
@@ -204,5 +203,4 @@ class RavenAdamW(Optimizer):
             
         state_dict['param_device'] = str(self.param_device)
         state_dict['global_step_counter'] = self.global_step_counter
-
         return state_dict
