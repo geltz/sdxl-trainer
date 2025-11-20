@@ -18,9 +18,8 @@ Features:
 - More timestep sampling choices
 - Optimizer state offload frequency
 - Reflection padding for EQ-VAE
-- Neutral light theme
-- Headless mode via cli wrapper     
-- Bonus utility scripts    
+- Neutral light theme  
+- More utility scripts    
 
 Usage:
 
