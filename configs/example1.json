@@ -16,7 +16,7 @@
     "PREDICTION_TYPE": "v_prediction",
     "BETA_SCHEDULE": "scaled_linear",
     "MAX_TRAIN_STEPS": 6000,
-    "LEARNING_RATE": 3e-05,
+    "LEARNING_RATE": 2e-06,
     "BATCH_SIZE": 1,
     "GRADIENT_ACCUMULATION_STEPS": 16,
     "MIXED_PRECISION": "bfloat16",
@@ -104,4 +104,5 @@
         "relative_step": false,
         "warmup_init": false
     }
+
 }
