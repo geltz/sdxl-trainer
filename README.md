@@ -11,14 +11,14 @@ Features:
 - Resume state from a training checkpoint   
 - UNet layer exclusion via keyword filter
 - Live statistics for learning rate, gradient norms and loss
-- Custom AdamW (Raven) that offloads to CPU for less VRAM    
+- AdamW (Raven) that offloads to CPU for less VRAM    
 - Train LoRAs and LoCons    
 - Tag caption dropout with wildcards
 - Flow matching scheduler  
 - More timestep sampling choices
 - Optimizer state offload frequency
 - Reflection padding for EQ-VAE
-- Improved GUI with neutral light theme
+- Neutral light theme
 - Headless mode via cli wrapper     
 - Bonus utility scripts    
 
