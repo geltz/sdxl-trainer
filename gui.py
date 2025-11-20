@@ -649,8 +649,8 @@ class LiveMetricsWidget(QtWidgets.QWidget):
         
         data_added = False
         
-        # FIX: More robust regex that handles variable spacing
-        # Matches: --- Step 123 | Loss 0.12345 | LR 1.00e-05 ---
+        # FIX: Regex modified to be more permissive with whitespace/format changes
+        # Looks for: Step 123 | Loss 0.5555 | LR 1.23e-5
         step_match = re.search(
             r'Step\s+(\d+)\s*\|\s*Loss\s+([\d.eE+-]+)\s*\|\s*LR\s+([\d.eE+-]+)',
             text
@@ -669,7 +669,8 @@ class LiveMetricsWidget(QtWidgets.QWidget):
             except ValueError:
                 pass
         
-        # Parse gradient norm format
+        # Parse gradient norm
+        # Looks for: Grad: 0.123 / 1.0
         grad_match = re.search(
             r'Grad[:\s]+([\d.eE+-]+)\s*/\s*([\d.eE+-]+)',
             text,
@@ -680,7 +681,6 @@ class LiveMetricsWidget(QtWidgets.QWidget):
                 raw_norm = float(grad_match.group(1))
                 clipped_norm = float(grad_match.group(2))
                 
-                # Only update graph if we have a valid step associated
                 if self.latest_step > 0:
                     self.pending_data.append(('grad', self.latest_step, raw_norm, clipped_norm))
                     self.latest_grad = raw_norm
@@ -690,7 +690,6 @@ class LiveMetricsWidget(QtWidgets.QWidget):
         
         if data_added:
             self.pending_update = True
-            # Start timer if not already running
             if not self.update_timer.isActive() and not self.pause_button.isChecked():
                 self.update_timer.start(self.update_interval_ms)
     

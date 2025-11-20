@@ -711,21 +711,9 @@ class TrainingDiagnostics:
         avg_loss = sum(self.losses) / len(self.losses)
         lr = optimizer.param_groups[0]["lr"]
         
-        # Calculate parameter update magnitude
-        if before_val is not None and after_val is not None:
-            upd = torch.abs(after_val - before_val).max().item()
-        else:
-            upd = 0.0
-
-        reserved = torch.cuda.memory_reserved() / 1e9 if torch.cuda.is_available() else 0.0
-        alloc = torch.cuda.memory_allocated() / 1e9 if torch.cuda.is_available() else 0.0
-        
-        # Use standard print with flush=True so GUI catches it immediately
-        # The format must match the Regex in gui.py exactly
+        # Use standard print with flush=True for GUI compatibility
         print(f"--- Step {global_step} | Loss {avg_loss:.5f} | LR {lr:.2e} ---", flush=True)
-        
-        # Print secondary info
-        print(f"  Grad: {raw_grad_norm:.4f} / {clipped_grad_norm:.4f} | VRAM: {reserved:.2f}GB", flush=True)
+        print(f"  Grad: {raw_grad_norm:.4f} / {clipped_grad_norm:.4f}", flush=True)
         
         self.losses.clear()
 
@@ -1287,19 +1275,25 @@ def main():
                 is_flow_matching = config.PREDICTION_TYPE == "flow_matching"
 
                 if is_flow_matching:
-                    # Normalize timesteps to [0, 1]
+                    # 1. Convert to continuous [0, 1]
                     t_continuous = timesteps.float() / (noise_scheduler.config.num_train_timesteps - 1)
                     
-                    # Apply shift if configured (SD3-style)
+                    # 2. Apply Shift if configured
+                    # CRITICAL FIX: If we shift the time for noise, we MUST shift the 'timesteps' input to UNet too.
                     shift_val = getattr(config, "FLOW_MATCHING_SHIFT", 1.0)
                     if shift_val != 1.0:
                         t_continuous = (t_continuous * shift_val) / (1 + (shift_val - 1) * t_continuous)
-                    
-                    # Lerp in latent space: x_t = (1-t)*x_0 + t*x_1
+                        
+                        # Re-calculate the integer timesteps passed to the UNet based on the SHIFTED time
+                        # Otherwise the UNet sees time=500 but the noise is from time=200
+                        timesteps = (t_continuous * (noise_scheduler.config.num_train_timesteps - 1)).long()
+                        timesteps = torch.clamp(timesteps, 0, noise_scheduler.config.num_train_timesteps - 1)
+
+                    # 3. Generate Noisy Latents (Rectified Flow Formula: x_t = (1-t)x_0 + t*x_1)
                     t_expanded = t_continuous.view(-1, 1, 1, 1)
                     noisy_latents = (1 - t_expanded) * latents + t_expanded * noise
                     
-                    # Target is velocity: v = x_1 - x_0 = noise - latents
+                    # 4. Target is velocity: v = x_1 - x_0 = noise - latents
                     target = noise - latents
                 else:
                     # Standard diffusion path
