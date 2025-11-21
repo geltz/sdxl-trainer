@@ -24,7 +24,7 @@
     "SEED": 777,
     "FLOW_MATCHING_SHIFT": 2.5,
     "SAVE_EVERY_N_STEPS": 100,
-    "UNET_EXCLUDE_TARGETS": "conv1, conv2",
+    "UNET_EXCLUDE_TARGETS": "conv1, conv2, conv_in, conv_out",
     "LR_CUSTOM_CURVE": [
         [
             0.0,
