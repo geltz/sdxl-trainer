@@ -711,9 +711,8 @@ class TrainingDiagnostics:
         avg_loss = sum(self.losses) / len(self.losses)
         lr = optimizer.param_groups[0]["lr"]
         
-        # Use standard print with flush=True for GUI compatibility
-        print(f"--- Step {global_step} | Loss {avg_loss:.5f} | LR {lr:.2e} ---", flush=True)
-        print(f"  Grad: {raw_grad_norm:.4f} / {clipped_grad_norm:.4f}", flush=True)
+        print(f"Step {global_step} | Loss {avg_loss:.5f} | LR {lr:.2e}", flush=True)
+        print(f"Grad: {raw_grad_norm:.4f} / {clipped_grad_norm:.4f}", flush=True)
         
         self.losses.clear()
 
