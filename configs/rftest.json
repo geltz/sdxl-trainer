@@ -1,6 +1,6 @@
 {
-    "SINGLE_FILE_CHECKPOINT_PATH": "D:/sdxl-models/NoobAI-RectifiedFlow-test-step486k.safetensors",
-    "VAE_PATH": "D:/sdxl-models/Pad EQB7 Decoder-only-pass.safetensors",
+    "SINGLE_FILE_CHECKPOINT_PATH": "D:/sdxl-trainer/models/NoobAI-RectifiedFlow-test-step486k.safetensors",
+    "VAE_PATH": "D:/sdxl-trainer/models/Pad EQB7 Decoder-only-pass.safetensors",
     "VAE_SHIFT_FACTOR": 0.0,
     "VAE_SCALING_FACTOR": 0.13025,
     "USE_REFLECTION_PADDING": true,
