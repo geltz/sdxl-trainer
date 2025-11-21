@@ -18,10 +18,10 @@ Features:
 - Train LoRAs and LoCons    
 - Tag caption dropout with wildcards
 - Flow matching scheduler  
-- More timestep sampling choices  
+- Timestep sampling choices  
 - Reflection padding for EQ-VAE
 - Neutral light theme  
-- More utility scripts    
+- Utility scripts    
 
 Usage:
 
