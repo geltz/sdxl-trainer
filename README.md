@@ -14,7 +14,7 @@ Features:
 - UNet layer exclusion via keyword filter
 - Live statistics for learning rate, gradient norms and loss
 - AdamW (Raven) that offloads to CPU for less VRAM
-- Gradient centralization (not recommended)      
+- Gradient centralization (experimental)      
 - Train LoRAs and LoCons    
 - Tag caption dropout with wildcards
 - Flow matching scheduler  
