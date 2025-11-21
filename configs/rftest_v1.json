@@ -15,8 +15,8 @@
     "NOISE_SCHEDULER": "FlowMatchEulerDiscreteScheduler",
     "PREDICTION_TYPE": "flow_matching",
     "BETA_SCHEDULE": "scaled_linear",
-    "MAX_TRAIN_STEPS": 4000,
-    "LEARNING_RATE": 5e-06,
+    "MAX_TRAIN_STEPS": 3000,
+    "LEARNING_RATE": 3e-05,
     "BATCH_SIZE": 1,
     "GRADIENT_ACCUMULATION_STEPS": 16,
     "MIXED_PRECISION": "bfloat16",
@@ -32,11 +32,23 @@
         ],
         [
             0.1,
-            5e-06
+            3e-05
+        ],
+        [
+            0.6,
+            3e-05
+        ],
+        [
+            0.7,
+            2.58e-05
         ],
         [
             0.8,
-            5e-06
+            1.55e-05
+        ],
+        [
+            0.9,
+            5.25e-06
         ],
         [
             1.0,
@@ -44,7 +56,7 @@
         ]
     ],
     "LR_GRAPH_MIN": 0.0,
-    "LR_GRAPH_MAX": 9e-06,
+    "LR_GRAPH_MAX": 5e-05,
     "MEMORY_EFFICIENT_ATTENTION": "sdpa",
     "USE_ZERO_TERMINAL_SNR": false,
     "GRAD_SPIKE_THRESHOLD_HIGH": 20.0,
