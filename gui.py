@@ -708,9 +708,9 @@ class LiveMetricsWidget(QtWidgets.QWidget):
                 self.lr_graph.append_data(self.lr_line_idx, step, lr)
                 self.loss_graph.append_data(self.loss_line_idx, step, loss)
             elif data[0] == 'grad' and last_step is not None:
-                _, raw_norm, clipped_norm = data
-                self.grad_graph.append_data(self.grad_raw_idx, last_step, raw_norm)
-                self.grad_graph.append_data(self.grad_clipped_idx, last_step, clipped_norm)
+                _, step, raw_norm, clipped_norm = data
+                self.grad_graph.append_data(self.grad_raw_idx, step, raw_norm)
+                self.grad_graph.append_data(self.grad_clipped_idx, step, clipped_norm)
         
         # Clear pending data
         self.pending_data.clear()
