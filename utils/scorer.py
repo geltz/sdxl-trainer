@@ -16,7 +16,7 @@ except ImportError:
 # ================= CONFIGURATION =================
 INPUT_FOLDER = r"."
 OUTPUT_FOLDER = r"./best_images"
-TOP_K = 5000  # How many images to keep?
+TOP_K = 6000  # How many images to keep?
 
 # Valid image extensions
 EXTENSIONS = {'.jpg', '.jpeg', '.png', '.webp', '.bmp'}
@@ -152,4 +152,5 @@ def main():
     print("\nDone!")
 
 if __name__ == "__main__":
+
     main()
