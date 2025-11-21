@@ -81,7 +81,12 @@
     "TAG_DROPOUT_RATE": 0.1,
     "TAG_DROPOUT_WHITELIST": "*girl*, *boy*, solo, masterpiece",
     "RESUME_TRAINING": false,
-    "INSTANCE_DATASETS": [],
+    "INSTANCE_DATASETS": [
+        {
+            "path": "D:/data",
+            "repeats": 1
+        }
+    ],
     "OPTIMIZER_TYPE": "raven",
     "RAVEN_PARAMS": {
         "betas": [
