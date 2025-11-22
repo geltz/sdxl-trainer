@@ -19,8 +19,7 @@ Features:
 - Tag caption dropout with wildcards
 - Flow matching scheduler  
 - Timestep sampling choices  
-- Reflection padding for EQ-VAE
-- Neutral light theme  
+- Reflection padding for EQ-VAE  
 - Utility scripts    
 
 Usage:
