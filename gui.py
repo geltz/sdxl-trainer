@@ -942,7 +942,7 @@ class LRCurveWidget(QtWidgets.QWidget):
         
         painter.setFont(original_font)
         font.setBold(True); painter.setFont(font)
-        painter.drawText(self.rect().adjusted(0, 5, 0, 0), QtCore.Qt.AlignmentFlag.AlignHCenter | QtCore.Qt.AlignmentFlag.AlignTop, "Learning Rate Schedule")
+        painter.drawText(self.rect().adjusted(0, 5, 0, 0), QtCore.Qt.AlignmentFlag.AlignHCenter | QtCore.Qt.AlignmentFlag.AlignTop, "")
     
     def draw_curve(self, painter):
         if not self._visual_points: return
@@ -982,12 +982,20 @@ class LRCurveWidget(QtWidgets.QWidget):
         if self._dragging_point_index != -1:
             norm_x, abs_lr = self._to_data_coords(event.pos().x(), event.pos().y())
             is_endpoint = self._dragging_point_index == 0 or self._dragging_point_index == len(self._points) - 1
+            
             if is_endpoint:
                 norm_x = 0.0 if self._dragging_point_index == 0 else 1.0
             else:
+                # Apply snapping to fixed step increments
+                snap_step = 0.05  # Snap to 5% increments. Change to 0.1 for 10%, etc.
+                norm_x = round(norm_x / snap_step) * snap_step
+                norm_x = max(0.0, min(1.0, norm_x))
+                
+                # Enforce ordering: point must stay between neighbors
                 min_x = self._points[self._dragging_point_index - 1][0]
                 max_x = self._points[self._dragging_point_index + 1][0]
                 norm_x = max(min_x, min(max_x, norm_x))
+            
             self._points[self._dragging_point_index] = [norm_x, abs_lr]
             self._update_visual_points()
             self.pointsChanged.emit(self._points)
