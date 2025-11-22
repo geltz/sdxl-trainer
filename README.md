@@ -5,7 +5,7 @@ Example configs are provided. Trainer will automatically generate a default one 
 Hardware requirements:
 
 - 12 gigabytes of VRAM
-- Less if only training LoRAs
+- Less if training LoRAs
 
 Features:    
  
