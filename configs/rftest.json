@@ -1,10 +1,10 @@
 {
-    "SINGLE_FILE_CHECKPOINT_PATH": "C:/Users/aorav/Documents/Apps/ComfyUI/models/checkpoints/NoobAI-RF-v0.5-step00002100.safetensors",
-    "VAE_PATH": "C:/Users/aorav/Documents/Apps/ComfyUI/models/vae/Pad EQB7 Decoder-only-pass.safetensors",
+    "SINGLE_FILE_CHECKPOINT_PATH": "NoobAI-RF-v0.5-step00002100.safetensors",
+    "VAE_PATH": "Pad EQB7 Decoder-only-pass.safetensors",
     "VAE_SHIFT_FACTOR": 0.0,
     "VAE_SCALING_FACTOR": 0.13025,
     "USE_REFLECTION_PADDING": true,
-    "OUTPUT_DIR": "C:/Users/aorav/Documents/Apps/ComfyUI/models/checkpoints",
+    "OUTPUT_DIR": "checkpoints",
     "RESUME_MODEL_PATH": "",
     "RESUME_STATE_PATH": "",
     "CACHING_BATCH_SIZE": 1,
@@ -79,7 +79,7 @@
     "RESUME_TRAINING": false,
     "INSTANCE_DATASETS": [
         {
-            "path": "C:/Users/aorav/Saved Games/Pictures/data",
+            "path": "data",
             "repeats": 1
         }
     ],
